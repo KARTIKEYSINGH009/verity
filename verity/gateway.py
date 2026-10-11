@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from . import config
 from .guard import detect_injection
+from .judge import judge_faithfulness
 from .scoring import faithfulness_score
 from .store import init_db, log_trace, recent_traces
 
@@ -97,11 +98,15 @@ async def chat_completions(req: ChatRequest):
     answer = result["choices"][0]["message"]["content"]
 
     # 3. Score faithfulness when grounding context was supplied.
+    # Milestone 2: LLM-as-judge is primary, heuristic kept as fallback/detail.
     score = None
-    if req.grounding_context:
+    if req.grounding_context and config.JUDGE_ENABLED:
+        score = judge_faithfulness(req.grounding_context, answer)
+    elif req.grounding_context:
         score = faithfulness_score(req.grounding_context, answer)
-        if score["verdict"] == "hallucination_risk":
-            flags = list(flags) + ["hallucination_risk"]
+        score["method"] = "heuristic"
+    if score and score["verdict"] == "hallucination_risk":
+        flags = list(flags) + ["hallucination_risk"]
 
     latency_ms = (time.perf_counter() - started) * 1000
     log_trace(req.model, combined, answer, latency_ms,

@@ -29,7 +29,7 @@ Dashboard: `streamlit run dashboard/app.py`
 - [x] OpenAI-compatible proxy gateway with request logging
 - [x] Prompt-injection guard (heuristic v0)
 - [x] Faithfulness scorer (grounding check v0)
-- [ ] LLM-as-judge scoring
+- [x] LLM-as-judge scoring (milestone 2; heuristic kept as fallback)
 - [ ] Fine-tuned injection classifier
 - [ ] Cost tracking per endpoint
 - [ ] Alerting (Slack/webhook)
