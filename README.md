@@ -111,6 +111,31 @@ All via environment variables:
 | `VERITY_JUDGE_MODEL` | `gpt-4o-mini` | Model used by the faithfulness judge |
 | `VERITY_JUDGE_ENABLED` | `true` | Toggle LLM-as-judge scoring |
 | `VERITY_DB_PATH` | `verity.db` | Trace database path (auto-falls back to temp dir when unwritable) |
+| `VERITY_ADMIN_KEY` | — (unset) | Key required to read `/v1/traces` via the `X-Verity-Admin-Key` header. **Unset = traces endpoint disabled (403)** — the safe default, since traces contain raw prompts and answers |
+| `VERITY_MAX_INPUT_CHARS` | `20000` | Combined user-input size cap; larger requests get `413 request_too_large` |
+| `VERITY_RATE_LIMIT_PER_MIN` | `120` | Per-client request cap on the chat endpoint (`429 rate_limited` beyond it; in-memory, per instance) |
+
+## API security & semantics
+
+- **Authentication:** the chat endpoint needs no key in mock mode; in live
+  mode Verity uses the operator's upstream key server-side (never exposed
+  to clients). `/v1/traces` is admin-only as described above — there is no
+  per-user trace access in this version.
+- **Block vs flag:** with `VERITY_BLOCK_ON_INJECTION=true` (default),
+  flagged requests are rejected with a structured `400`; with it off, they
+  pass through carrying `verity.guard_flags` for downstream handling.
+  Policy violations always reject (request side and response side).
+- **Judge failure behavior:** if the judge model errors or is unconfigured,
+  scoring falls back to the heuristic and the response's
+  `verity.faithfulness.method` says so explicitly — a fallback is never
+  silently presented as a judge verdict. Faithfulness scores are
+  estimates, not guarantees of truth.
+- **Retention:** traces live in the operator's own SQLite database
+  (`VERITY_DB_PATH`); retention is the operator's policy — delete or
+  rotate the file. On Vercel the DB sits in `/tmp` and resets on
+  redeploy; the rate limiter is likewise per-instance best-effort.
+- **Disclosure:** report vulnerabilities via GitHub Security Advisories
+  on this repository rather than a public issue.
 
 ## The learning workflow
 
@@ -130,22 +155,29 @@ controlled pipeline, so the training data cannot be quietly poisoned:
 
 ## Benchmarks
 
-Held-out evaluation — 40 prompts disjoint from all training data (22 fresh
-attacks in new phrasings, 18 deliberately hard benign near-misses).
-Reproduce: `python scripts/run_benchmarks.py` (writes `site/benchmarks.json`).
+Held-out evaluation — 45 prompts disjoint from all training data (25 fresh
+attacks in new phrasings, including multilingual and spacing-obfuscated,
+and 20 deliberately hard benign near-misses). The decision threshold was
+checked on a separate 16-prompt validation set (sweep recorded in the
+JSON); the test set is never used for tuning.
+Reproduce: `python scripts/run_benchmarks.py` (writes `site/benchmarks.json`,
+including run metadata: commit, dataset sizes, latency percentiles).
 
-| Mode | Recall | Precision | False-positive rate |
-| --- | --- | --- | --- |
-| Rules only | 0.0 | — | 0.0 |
-| Classifier only | 0.909 | 0.909 | 0.111 |
-| Combined (production) | 0.909 | 0.909 | 0.111 |
+| Mode | Recall | Precision | F1 | False-positive rate |
+| --- | --- | --- | --- | --- |
+| Rules only | 0.0 | — | — | 0.0 |
+| Classifier only | 0.88 | 0.917 | 0.898 | 0.10 |
+| Combined (production) | 0.88 | 0.917 | 0.898 | 0.10 |
 
 Per-category recall (combined): injection, impersonation, social
-engineering, and data theft at 1.0; fraud (0.67) and harmful-content
-paraphrases (0.5) are the known weak classes and the top priority for
-dataset growth.
-Average screening latency ≈ 0.5 ms locally (screening only, excluding the
-model provider call). Rules alone catch known phrasings deterministically;
+engineering, and data theft at 1.0; fraud (0.67), harmful-content and
+multilingual paraphrases (0.5) are the known weak classes and the top
+priority for dataset growth.
+Screening latency locally: p50 ≈ 0.2 ms, p95 ≈ 0.7 ms (screening only,
+excluding the model provider call). Faithfulness heuristic (the judge's
+offline fallback): 0.75 verdict accuracy on an 8-case labelled mini-eval,
+unsupported-answer precision 1.0 / recall 0.5 — small-sample signal, not
+an SLA. Rules alone catch known phrasings deterministically;
 generalization to new phrasings comes from the trained layer. No filter
 guarantees complete protection — Verity's job is risk reduction plus
 evidence.

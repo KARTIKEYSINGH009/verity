@@ -451,7 +451,7 @@
 
     <div class="proof-strip">
       <div class="wrap proof-grid" aria-label="Project status">
-        <div class="proof-item"><strong>71 / 71</strong><span>tests passing in the current build</span></div>
+        <div class="proof-item"><strong>77 / 77</strong><span>tests passing in the current build (test-suite result, not detection accuracy)</span></div>
         <div class="proof-item"><strong>4 layers</strong><span>guard, policy, judge, and traces</span></div>
         <div class="proof-item"><strong>1-line swap</strong><span>point your OpenAI client at /v1</span></div>
       </div>
@@ -551,17 +551,17 @@
       <div class="wrap">
         <div class="section-head">
           <h2>Measured, not promised.</h2>
-          <p>Held-out benchmark: 40 prompts the model never trained on — 22 fresh attacks in new phrasings, 18 deliberately hard benign near-misses. Reproduce it from the repository with <code>python scripts/run_benchmarks.py</code>; full data in <a href="/benchmarks.json">benchmarks.json</a>.</p>
+          <p>Held-out benchmark: 45 prompts the model never trained on — 25 fresh attacks in new phrasings (including multilingual and spacing-obfuscated), 20 deliberately hard benign near-misses. Threshold checked on a separate 16-prompt validation set. Reproduce it from the repository with <code>python scripts/run_benchmarks.py</code>; full data in <a href="/benchmarks.json">benchmarks.json</a>.</p>
         </div>
         <div class="proof-grid" aria-label="Benchmark results">
-          <div class="proof-item"><strong>90.9%</strong><span>attack recall, combined guard (held-out)</span></div>
-          <div class="proof-item"><strong>90.9%</strong><span>precision — few false alarms</span></div>
-          <div class="proof-item"><strong>~0.5 ms</strong><span>average screening latency, local</span></div>
+          <div class="proof-item"><strong>88%</strong><span>attack recall, combined guard (held-out)</span></div>
+          <div class="proof-item"><strong>91.7%</strong><span>precision — few false alarms</span></div>
+          <div class="proof-item"><strong>~0.2 ms</strong><span>median screening latency (p50), local</span></div>
         </div>
         <div class="layers">
           <div class="layer"><b>Rules alone: 0% recall</b><p>Heuristics only catch attacks phrased like known patterns. On novel wording they are a safety net, not a shield — which is why the learned layer exists.</p></div>
-          <div class="layer"><b>Classifier: 90.9% recall</b><p>The trained model generalizes to new phrasings. Per-category recall: injection, impersonation, social engineering, data theft, harmful content — 100%. Fraud (67%) and harmful-content paraphrases (50%) are the weakest classes.</p></div>
-          <div class="layer"><b>Known limitations</b><p>The training set is a prototype baseline (173 examples) and grows through the corrections loop. False-positive rate is 11.1% on deliberately hard benign prompts. The faithfulness heuristic (the judge’s offline fallback) scores 75% verdict accuracy on an 8-case mini-eval in benchmarks.json; the LLM judge is primary in live mode. No filter can guarantee complete protection — Verity reduces risk and records evidence; it does not eliminate either.</p></div>
+          <div class="layer"><b>Classifier: 90.9% recall</b><p>The trained model generalizes to new phrasings. Per-category recall: injection, impersonation, social engineering, data theft — 100%. Weakest classes: fraud (67%), harmful-content and multilingual paraphrases (50%).</p></div>
+          <div class="layer"><b>Known limitations</b><p>The training set is a prototype baseline (173 examples) and grows through the corrections loop. False-positive rate is 10% on deliberately hard benign prompts. The faithfulness heuristic (the judge’s offline fallback) scores 75% verdict accuracy on an 8-case mini-eval in benchmarks.json (unsupported-answer precision 1.0, recall 0.5); the LLM judge is primary in live mode. No filter can guarantee complete protection — Verity reduces risk and records evidence; it does not eliminate either.</p></div>
         </div>
       </div>
     </section>
@@ -599,6 +599,8 @@
             <li>Business-policy enforcement via policy_context</li>
             <li>Faithfulness grading via grounding_context</li>
             <li>Blocked requests return a structured 400: blocked_by_verity_guard / blocked_by_verity_policy</li>
+            <li>Traces are admin-only: /v1/traces needs VERITY_ADMIN_KEY and is disabled when no key is set</li>
+            <li>Public-endpoint abuse controls: 20k-char input cap, per-client rate limit</li>
             <li>Graceful fallback when judge or classifier is unavailable</li>
           </ul>
           <pre style="margin-top:18px"><span class="cmt"># curl, against the live demo</span>
@@ -651,7 +653,7 @@ client = OpenAI(
         </div>
         <div class="layers">
           <div class="layer"><b>Open source (MIT)</b><p>Full source, training data, and benchmark scripts are public under the MIT license: <a href="https://github.com/KARTIKEYSINGH009/verity">github.com/KARTIKEYSINGH009/verity</a>. Found a bypass? That is a contribution — new attacks enter the reviewed corrections loop and make the next model stronger.</p></div>
-          <div class="layer"><b>Data handling</b><p>Your deployment stores its own traces (inputs, outputs, flags, latency) in its own database — you set retention. In live mode, answer text is sent to your chosen judge model under your provider key. This public demo runs in mock mode; its traces live in ephemeral storage and reset on redeploy.</p></div>
+          <div class="layer"><b>Data handling</b><p>Your deployment stores its own traces (inputs, outputs, flags, latency) in its own database — you set retention. In live mode, answer text is sent to your chosen judge model under your provider key. This public demo runs in mock mode; its traces live in ephemeral storage and reset on redeploy — and the traces endpoint is disabled here, because traces contain raw prompts. Found a vulnerability? Please report it through GitHub Security Advisories on the repository instead of opening a public issue.</p></div>
           <div class="layer"><b>Screening is not authorization</b><p>Verity classifies content and enforces declared policy on requests and answers. It is not an authorization system: sensitive actions (refunds, transfers, record changes) must also be permission-checked at your tool and backend boundary. Never let a model answer alone authorize one.</p></div>
         </div>
       </div>
@@ -728,6 +730,18 @@ client = OpenAI(
           : 'Live check: this calls the real Verity gateway — rules plus the trained classifier — the same API protecting this site.';
       }
 
+      // Any edit invalidates the previous verdict — never show stale results.
+      document.getElementById('guard-input').addEventListener('input', function () {
+        document.getElementById('guard-result').classList.remove('visible');
+        document.getElementById('guard-empty').hidden = false;
+      });
+      ['context-input', 'answer-input'].forEach(function (id) {
+        document.getElementById(id).addEventListener('input', function () {
+          document.getElementById('ground-result').classList.remove('visible');
+          document.getElementById('ground-empty').hidden = false;
+        });
+      });
+
       document.getElementById('run-guard').addEventListener('click', function () {
         var text = document.getElementById('guard-input').value.trim();
         if (!text) return;
@@ -735,15 +749,19 @@ client = OpenAI(
         btn.disabled = true;
         btn.textContent = 'Screening…';
         var started = performance.now();
+        var controller = new AbortController();
+        var timer = setTimeout(function () { controller.abort(); }, 15000);
         fetch('/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: text }] })
+          body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: text }] }),
+          signal: controller.signal
         }).then(function (resp) {
           return resp.json().catch(function () { return null; }).then(function (data) {
             return { status: resp.status, data: data };
           });
         }).then(function (r) {
+          clearTimeout(timer);
           var latency = Math.round(performance.now() - started);
           if (r.status === 400 && r.data && r.data.detail) {
             var d = r.data.detail;
@@ -757,9 +775,14 @@ client = OpenAI(
           } else {
             throw new Error('unexpected status ' + r.status);
           }
-        }).catch(function () {
+        }).catch(function (err) {
+          clearTimeout(timer);
+          var timedOut = err && err.name === 'AbortError';
           var hits = rules.filter(function (item) { return item[1].test(text); }).map(function (item) { return item[0]; });
           renderGuard(hits.length > 0, hits, hits.length > 0 ? 'blocked_by_verity_guard' : 'allow', 'local rules (fallback)', null, true);
+          document.getElementById('guard-note').textContent = timedOut
+            ? 'The live gateway timed out (15s) — this verdict is the local rule fallback, not a live result.'
+            : 'The live gateway is unreachable — this verdict is the local rule fallback, not a live result.';
         }).then(function () {
           btn.disabled = false;
           btn.textContent = 'Screen prompt';
