@@ -27,12 +27,14 @@ your app ──► Verity gateway ──► model provider (OpenAI-compatible)
   requests return `400` with the matched signals named, e.g.
   `["ignore_instructions", "system_prompt_extract", "ml_classifier"]`.
   Inputs are normalized first (contractions expanded, obfuscation
-  characters stripped) so respelling tricks can't slip past, and a
-  **corrections loop** keeps the model learning: every new attack found in
-  the field is appended to `scripts/corrections.jsonl` and folded into the
-  next training run. A red-team suite in the test pipeline keeps every
-  abuse family covered — and keeps benign near-misses (like a plain refund
-  demand) passing.
+  characters stripped) so respelling tricks can't slip past. A
+  **corrections loop** keeps the model learning under human control:
+  field-found attacks are stored as candidates in
+  `scripts/corrections.jsonl`, a reviewer confirms each label, and a
+  retrained model ships only if the test suite and held-out benchmark
+  show no unacceptable regression (workflow below). A red-team suite in
+  the test pipeline keeps every abuse family covered — and keeps benign
+  near-misses (like a plain refund demand) passing.
 - **Faithfulness judge** — when a request carries `grounding_context`, an
   **LLM-as-judge** grades the answer against the source material and returns
   a structured verdict: score 0–1, `grounded` / `partially_grounded` /
@@ -110,6 +112,22 @@ All via environment variables:
 | `VERITY_JUDGE_ENABLED` | `true` | Toggle LLM-as-judge scoring |
 | `VERITY_DB_PATH` | `verity.db` | Trace database path (auto-falls back to temp dir when unwritable) |
 
+## The learning workflow
+
+Adaptive does not mean automatic. New attacks reach the model through a
+controlled pipeline, so the training data cannot be quietly poisoned:
+
+1. A suspected missed attack is stored as a **candidate** in
+   `scripts/corrections.jsonl`.
+2. A **human reviewer confirms the label** — unreviewed data never trains
+   the model.
+3. Approved examples join the training set; the model retrains
+   (`python scripts/train_injection_classifier.py`).
+4. The **full test suite and the held-out benchmark run as the gate**: the
+   new model ships only if recall improves without unacceptable
+   false-positive regressions.
+5. Deploy is a normal Git push of the two weight files; Vercel redeploys.
+
 ## Benchmarks
 
 Held-out evaluation — 40 prompts disjoint from all training data (22 fresh
@@ -160,9 +178,31 @@ tests/                     Test suite
 - [x] Live deployment (Vercel; website + API in one deployment)
 - [x] Business-policy guard (milestone 4; request + response enforcement, LLM policy judge in live mode)
 - [x] All-abuse hardening (growing dataset — 173 examples — across nine abuse families, 11 guard rules, red-team suite, published held-out benchmark)
-- [x] Learning guard (milestone 5; normalization + character n-grams, corrections loop retrains on field-found attacks)
+- [x] Learning guard (milestone 5; normalization + character n-grams, human-reviewed benchmark-gated corrections loop)
 - [ ] Cost tracking per endpoint
 - [ ] Alerting (Slack / webhook)
+
+## Threat model (summary)
+
+Verity defends the LLM boundary of an application:
+
+- **In scope:** prompt injection and jailbreak attempts, impersonation and
+  social engineering of support bots, fraud coaching, exfiltration of
+  other users' data or the model's own credentials, business-policy
+  violations in requests and answers, and ungrounded (hallucinated)
+  answers — each logged as evidence.
+- **Out of scope / not a substitute for:** authentication and
+  authorization at your own tool and backend boundary (Verity classifies
+  content; it does not grant permissions), network-layer attacks, and a
+  compromised upstream model provider.
+- **Honest limits:** detection is probabilistic. The published benchmark
+  quantifies recall and false-positive rates on held-out data; a
+  determined attacker with novel techniques may still get through, which
+  is why traces and the corrections loop exist.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
 
 ---
 

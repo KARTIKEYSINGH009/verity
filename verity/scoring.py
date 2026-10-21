@@ -1,12 +1,14 @@
-"""Faithfulness scorer, grounding-check v0.
+"""Faithfulness scorer, grounding-check v1.
 
 Given the context the model was allowed to use and the answer it produced,
-estimates how grounded the answer is: what fraction of the answer's
-sentences share meaningful content words with the context.
+estimates how grounded the answer is: for each answer sentence, what
+fraction of its content words are supported by the context; a sentence
+counts as grounded when at least half of its content words are supported.
 
-This is intentionally naive — it establishes the scoring interface.
-Milestone 2 replaces it with LLM-as-judge, milestone 3 with a fine-tuned
-natural-language-inference model.
+This is a deterministic heuristic. In live mode the LLM-as-judge
+(milestone 2) is the primary scorer and this remains the offline fallback.
+(v0 counted a sentence as grounded on ANY shared word, which scored even
+invented answers as fully grounded — fixed in v1.)
 """
 import re
 
@@ -18,8 +20,12 @@ _STOP = frozenset(
 )
 
 
+def _stem(word: str) -> str:
+    return word[:-1] if len(word) > 3 and word.endswith("s") else word
+
+
 def _keywords(text: str) -> set[str]:
-    return set(_WORD.findall(text.lower())) - _STOP
+    return {_stem(w) for w in _WORD.findall(text.lower())} - _STOP
 
 
 def _sentences(text: str) -> list[str]:
@@ -34,7 +40,14 @@ def faithfulness_score(context: str, answer: str) -> dict:
                 "grounded_sentences": 0, "total_sentences": 0}
     ctx_words = _keywords(context)
     sents = _sentences(answer)
-    grounded = sum(1 for s in sents if _keywords(s) & ctx_words)
+
+    def supported_fraction(sentence: str) -> float:
+        words = _keywords(sentence)
+        if not words:
+            return 0.0
+        return len(words & ctx_words) / len(words)
+
+    grounded = sum(1 for s in sents if supported_fraction(s) >= 0.5)
     score = grounded / len(sents) if sents else 0.0
     verdict = ("grounded" if score >= 0.7
                else "partially_grounded" if score >= 0.4

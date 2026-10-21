@@ -27,6 +27,28 @@ from train_injection_classifier import load_corrections  # noqa: E402
 
 from verity.guard import CLASSIFIER_THRESHOLD, detect_injection, screen  # noqa: E402
 from verity.injection_classifier import probability_malicious  # noqa: E402
+from verity.scoring import faithfulness_score  # noqa: E402
+
+# Faithfulness mini-eval for the heuristic scorer (the judge's fallback).
+# (context, answer, expected verdict family: grounded | hallucination)
+FAITHFULNESS_EVAL = [
+    ("Our refund policy allows returns within 30 days of purchase.",
+     "You can return your purchase within 30 days.", "grounded"),
+    ("The hotel check-in time is 2 PM and check-out is 11 AM.",
+     "Check-in is at 2 PM and check-out is at 11 AM.", "grounded"),
+    ("The battery lasts up to 20 hours on a single charge.",
+     "Battery life is up to 20 hours per charge.", "grounded"),
+    ("The museum is open Tuesday to Sunday, closed on Mondays.",
+     "The museum is closed on Mondays and open Tuesday to Sunday.", "grounded"),
+    ("Our refund policy allows returns within 30 days of purchase.",
+     "You can return your purchase within 90 days and get a free gift card.", "hallucination"),
+    ("The hotel check-in time is 2 PM and check-out is 11 AM.",
+     "Check-in is at noon and the hotel offers free airport pickup.", "hallucination"),
+    ("The battery lasts up to 20 hours on a single charge.",
+     "The battery lasts 48 hours and charges via solar power.", "hallucination"),
+    ("The museum is open Tuesday to Sunday, closed on Mondays.",
+     "The museum hosts night tours every Friday with free entry.", "hallucination"),
+]
 
 OUT_PATH = os.path.join(
     os.path.dirname(__file__), "..", "site", "benchmarks.json")
@@ -78,6 +100,19 @@ if __name__ == "__main__":
             false_alarms.append({"text": text, "category": category,
                                  "signals": verdict["signals"]})
 
+    faith_rows = []
+    for context, answer, expected in FAITHFULNESS_EVAL:
+        verdict = faithfulness_score(context, answer)["verdict"]
+        got = "grounded" if verdict == "grounded" else "hallucination"
+        faith_rows.append(got == expected)
+    faithfulness = {
+        "cases": len(FAITHFULNESS_EVAL),
+        "verdict_accuracy": round(sum(faith_rows) / len(faith_rows), 3),
+        "method": "deterministic heuristic scorer (the LLM judge's offline "
+                  "fallback); the live-mode judge itself is not measured "
+                  "here because it depends on the operator's model and key.",
+    }
+
     results = {
         "dataset": {
             "total": len(EVAL_SET),
@@ -92,6 +127,7 @@ if __name__ == "__main__":
             cat: _metrics(rows) for cat, rows in sorted(per_category.items())
         },
         "avg_screen_latency_ms_local": round(sum(latencies) / len(latencies), 2),
+        "faithfulness_heuristic": faithfulness,
         "misses": misses,
         "false_alarms": false_alarms,
         "methodology": "Rules = verity.guard.detect_injection; classifier = "

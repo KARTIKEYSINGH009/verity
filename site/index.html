@@ -484,11 +484,11 @@
                 <button class="run" id="run-guard">Screen prompt</button>
               </div>
               <div class="work-output" aria-live="polite">
-                <div class="result-empty" id="guard-empty">Run the screen to see whether the request would pass the rule layer—and which signals were found.</div>
+                <div class="result-empty" id="guard-empty">Run the screen to see the live gateway verdict — which layer decided, the signals found, and the latency.</div>
                 <div class="result-card" id="guard-result">
                   <div class="result-status">
-                    <div class="result-icon" id="guard-icon">!</div>
-                    <div><h3 id="guard-title">Blocked</h3><p id="guard-subtitle">Request stops before the model</p></div>
+                    <div class="result-icon" id="guard-icon">…</div>
+                    <div><h3 id="guard-title">Ready to test</h3><p id="guard-subtitle">No test run yet</p></div>
                   </div>
                   <div class="field-label"><span>Risk signal</span><span id="guard-score">—</span></div>
                   <div class="meter" aria-hidden="true"><i id="guard-meter"></i></div>
@@ -528,8 +528,8 @@
                 <div class="result-empty" id="ground-empty">Score the answer to see how many sentences share meaningful content with the supplied context.</div>
                 <div class="result-card" id="ground-result">
                   <div class="result-status">
-                    <div class="result-icon" id="ground-icon">✓</div>
-                    <div><h3 id="ground-title">Grounded</h3><p id="ground-subtitle">Answer aligns with the source</p></div>
+                    <div class="result-icon" id="ground-icon">…</div>
+                    <div><h3 id="ground-title">Ready to test</h3><p id="ground-subtitle">No scoring run yet</p></div>
                   </div>
                   <div class="field-label"><span>Faithfulness</span><span id="ground-score">—</span></div>
                   <div class="meter" aria-hidden="true"><i id="ground-meter"></i></div>
@@ -637,7 +637,7 @@ client = OpenAI(
           <div class="milestone"><span class="id">M3</span><div><strong>Trained injection classifier</strong><p>Naive Bayes over word unigrams and bigrams, layered with rules and shipped weights.</p></div><span class="tag">SHIPPED</span></div>
           <div class="milestone"><span class="id">M4</span><div><strong>Business-policy guard</strong><p>Per-request policy enforcement: prohibited actions are blocked before the model can comply, and non-compliant answers are blocked before the user.</p></div><span class="tag">SHIPPED</span></div>
           <div class="milestone"><span class="id">SEC</span><div><strong>All-abuse hardening</strong><p>Classifier trained on a growing dataset (173 examples) across nine abuse families, a red-team suite in the test pipeline, and a published held-out benchmark.</p></div><span class="tag">SHIPPED</span></div>
-          <div class="milestone"><span class="id">M5</span><div><strong>Learning guard</strong><p>Input normalization and character n-grams defeat respelling tricks, and a corrections loop retrains the model on every new attack found in the field.</p></div><span class="tag">SHIPPED</span></div>
+          <div class="milestone"><span class="id">M5</span><div><strong>Learning guard</strong><p>Input normalization and character n-grams defeat respelling tricks. Field-found attacks enter a corrections loop — human-reviewed and benchmark-gated — before any retrained model ships; unreviewed data never trains the model.</p></div><span class="tag">SHIPPED</span></div>
           <div class="milestone"><span class="id">NEXT</span><div><strong>Cost tracking and alerts</strong><p>Per-endpoint usage visibility, then Slack or webhook notifications for risky events.</p></div><span class="tag next">ROADMAP</span></div>
         </div>
       </div>
@@ -650,7 +650,7 @@ client = OpenAI(
           <p>Verity inspects AI traffic, so its own behavior has to be inspectable too.</p>
         </div>
         <div class="layers">
-          <div class="layer"><b>Open source</b><p>Full source, training data, and benchmark scripts are public: <a href="https://github.com/KARTIKEYSINGH009/verity">github.com/KARTIKEYSINGH009/verity</a>. Found a bypass? That is a contribution — new attacks enter the corrections loop and make the next model stronger.</p></div>
+          <div class="layer"><b>Open source (MIT)</b><p>Full source, training data, and benchmark scripts are public under the MIT license: <a href="https://github.com/KARTIKEYSINGH009/verity">github.com/KARTIKEYSINGH009/verity</a>. Found a bypass? That is a contribution — new attacks enter the reviewed corrections loop and make the next model stronger.</p></div>
           <div class="layer"><b>Data handling</b><p>Your deployment stores its own traces (inputs, outputs, flags, latency) in its own database — you set retention. In live mode, answer text is sent to your chosen judge model under your provider key. This public demo runs in mock mode; its traces live in ephemeral storage and reset on redeploy.</p></div>
           <div class="layer"><b>Screening is not authorization</b><p>Verity classifies content and enforces declared policy on requests and answers. It is not an authorization system: sensitive actions (refunds, transfers, record changes) must also be permission-checked at your tool and backend boundary. Never let a model answer alone authorize one.</p></div>
         </div>
@@ -767,9 +767,10 @@ client = OpenAI(
       });
 
       var stopWords = new Set('the a an and or for with from that this these those are was were been has have had will would can could should into than then they them their its you your our'.split(' '));
+      function stem(word) { return word.length > 3 && word.endsWith('s') ? word.slice(0, -1) : word; }
       function keywords(text) {
         var words = (text.toLowerCase().match(/[a-z0-9]{3,}/g) || []);
-        return new Set(words.filter(function (word) { return !stopWords.has(word); }));
+        return new Set(words.map(stem).filter(function (word) { return !stopWords.has(word); }));
       }
       function sentences(text) {
         return text.trim().split(/(?<=[.!?])\s+/).filter(Boolean);
@@ -790,9 +791,9 @@ client = OpenAI(
         var grounded = 0;
         parts.forEach(function (sentence) {
           var words = keywords(sentence);
-          var match = false;
-          words.forEach(function (word) { if (ctx.has(word)) match = true; });
-          if (match) grounded += 1;
+          var supported = 0;
+          words.forEach(function (word) { if (ctx.has(word)) supported += 1; });
+          if (words.size && supported / words.size >= 0.5) grounded += 1;
         });
         var score = context && answer && parts.length ? grounded / parts.length : 0;
         var verdict = score >= .7 ? 'grounded' : score >= .4 ? 'partially_grounded' : 'hallucination_risk';
