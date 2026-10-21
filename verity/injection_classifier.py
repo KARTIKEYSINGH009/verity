@@ -98,7 +98,7 @@ def load_model(path: str | None = None) -> dict | None:
     if path is not None:
         try:
             with open(path, encoding="utf-8") as fh:
-                return json.load(fh)
+                return _from_file_format(json.load(fh))
         except (OSError, ValueError):
             return None
     if _MODEL_TRIED:
@@ -106,7 +106,7 @@ def load_model(path: str | None = None) -> dict | None:
     _MODEL_TRIED = True
     try:
         with open(_MODEL_PATH, encoding="utf-8") as fh:
-            _MODEL = json.load(fh)
+            _MODEL = _from_file_format(json.load(fh))
     except (OSError, ValueError):
         _MODEL = None
     return _MODEL
@@ -135,18 +135,42 @@ def probability_malicious(text: str, model: dict | None = None) -> float | None:
     return round(exps["malicious"] / total, 4)
 
 
-def save_model(model: dict, path: str) -> None:
-    """Write weights with rounded floats — keeps the shipped JSON compact."""
-    compact = {
-        **model,
+def _to_file_format(model: dict) -> dict:
+    """Compact on-disk form: one shared vocab list + aligned weight arrays
+    (storing every feature key twice, once per class, doubled the file)."""
+    vocab = sorted(model["log_prob"]["malicious"].keys())
+    return {
+        "format": 2,
+        "alpha": model["alpha"],
+        "vocab_size": len(vocab),
+        "vocab": vocab,
         "log_prior": {c: round(v, 4) for c, v in model["log_prior"].items()},
         "log_prob": {
-            c: {f: round(v, 4) for f, v in probs.items()}
-            for c, probs in model["log_prob"].items()
+            c: [round(model["log_prob"][c][f], 4) for f in vocab]
+            for c in CLASSES
         },
         "log_prob_oov": {c: round(v, 4)
                          for c, v in model["log_prob_oov"].items()},
     }
+
+
+def _from_file_format(raw: dict) -> dict:
+    if raw.get("format") != 2:
+        return raw  # legacy dict format
+    vocab = raw["vocab"]
+    return {
+        "alpha": raw["alpha"],
+        "vocab_size": raw["vocab_size"],
+        "log_prior": raw["log_prior"],
+        "log_prob": {
+            c: dict(zip(vocab, raw["log_prob"][c])) for c in CLASSES
+        },
+        "log_prob_oov": raw["log_prob_oov"],
+    }
+
+
+def save_model(model: dict, path: str) -> None:
+    """Write weights in the compact array format (rounded floats)."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as fh:
-        json.dump(compact, fh)
+        json.dump(_to_file_format(model), fh)
