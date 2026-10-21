@@ -1,19 +1,44 @@
 """SQLite trace log: every request through the gateway is recorded here."""
 import json
 import sqlite3
+import tempfile
 import time
 from pathlib import Path
 
 from . import config
 
 
+def _fallback_path() -> str:
+    return str(Path(tempfile.gettempdir()) / "verity.db")
+
+
 def _connect():
-    conn = sqlite3.connect(config.DB_PATH)
+    try:
+        conn = sqlite3.connect(config.DB_PATH)
+    except sqlite3.OperationalError:
+        # Configured path is unwritable (e.g. read-only serverless
+        # filesystem): fall back to the temp dir instead of crashing.
+        fallback = _fallback_path()
+        if config.DB_PATH == fallback:
+            raise
+        config.DB_PATH = fallback
+        conn = sqlite3.connect(config.DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 def init_db() -> None:
+    try:
+        _init_db_once()
+    except sqlite3.OperationalError:
+        fallback = _fallback_path()
+        if config.DB_PATH == fallback:
+            raise
+        config.DB_PATH = fallback
+        _init_db_once()
+
+
+def _init_db_once() -> None:
     conn = _connect()
     conn.execute(
         """
