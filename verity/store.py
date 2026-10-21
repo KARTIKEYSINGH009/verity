@@ -72,6 +72,10 @@ def log_trace(model, input_text, output_text, latency_ms,
     )
     conn.commit()
     row_id = cur.lastrowid
+    if config.TRACE_RETENTION_DAYS > 0:
+        cutoff = time.time() - config.TRACE_RETENTION_DAYS * 86400
+        conn.execute("DELETE FROM traces WHERE ts < ?", (cutoff,))
+        conn.commit()
     conn.close()
     return row_id
 

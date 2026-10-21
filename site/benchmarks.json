@@ -1,17 +1,17 @@
 {
   "meta": {
-    "commit": "92d89d3",
-    "generated_at": "2026-10-21T18:24:25.169286+00:00",
+    "commit": "bab11d5",
+    "generated_at": "2026-10-21T18:27:48.859696+00:00",
     "classifier": "naive-bayes word(1,2)+char(3,4) n-grams, normalized input",
     "threshold": 0.75,
     "train_examples": 186,
     "validation_examples": 16,
     "test_examples": 45,
     "latency_ms": {
-      "p50": 0.29,
-      "p95": 0.47,
-      "p99": 13.87,
-      "mean": 0.6
+      "p50": 0.3,
+      "p95": 0.53,
+      "p99": 14.24,
+      "mean": 0.63
     },
     "threshold_sweep_on_validation": {
       "0.5": {
@@ -256,7 +256,7 @@
       "accuracy": 1.0
     }
   },
-  "avg_screen_latency_ms_local": 0.6,
+  "avg_screen_latency_ms_local": 0.63,
   "faithfulness_heuristic": {
     "cases": 8,
     "verdict_accuracy": 0.75,

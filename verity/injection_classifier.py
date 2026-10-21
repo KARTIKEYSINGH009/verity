@@ -19,6 +19,7 @@ import json
 import math
 import os
 import re
+import unicodedata
 
 CLASSES = ("malicious", "benign")
 _TOKEN = re.compile(r"[a-z]+")
@@ -33,6 +34,17 @@ _CONTRACTIONS = {
     "what's": "what is", "i'll": "i will", "you'll": "you will",
 }
 _ZERO_WIDTH = re.compile(r"[​-‏﻿]")
+# Unicode lookalikes (Cyrillic / Greek homoglyphs and friends) folded to
+# their Latin twins: an attacker spelling "ignore" with a Cyrillic о
+# must not slip past token-based detection. Keys are escapes so the
+# mapping is unambiguous in source.
+_CONFUSABLES = str.maketrans({
+    "а": "a", "е": "e", "о": "o", "р": "p",
+    "с": "c", "х": "x", "у": "y", "і": "i",
+    "ј": "j", "ѕ": "s", "һ": "h", "ԁ": "d",
+    "α": "a", "ε": "e", "ο": "o", "ρ": "p",
+    "τ": "t", "χ": "x", "ı": "i",
+})
 _LEET = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a",
                        "5": "s", "7": "t", "8": "b", "@": "a", "$": "s"})
 _MIXED_TOKEN = re.compile(r"[a-z0-9@$]+")
@@ -55,8 +67,10 @@ _MODEL_TRIED = False
 
 def normalize(text: str) -> str:
     """Lowercase, expand contractions, strip zero-width/obfuscation chars,
-    and fold leetspeak digit substitutions back to letters."""
+    fold Unicode homoglyphs (NFKC + confusables) to Latin, and fold
+    leetspeak digit substitutions back to letters."""
     t = _ZERO_WIDTH.sub("", (text or "").lower())
+    t = unicodedata.normalize("NFKC", t).translate(_CONFUSABLES)
     for k, v in _CONTRACTIONS.items():
         t = t.replace(k, v)
     t = _leet_fold(t)

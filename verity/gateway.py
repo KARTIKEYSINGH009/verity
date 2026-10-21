@@ -4,6 +4,7 @@ Drop-in replacement for the OpenAI chat-completions endpoint:
 point your client at http://<verity-host>:8000/v1 instead of
 https://api.openai.com/v1. Everything else stays the same.
 """
+import hmac
 import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
@@ -27,7 +28,12 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Verity gateway", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="Verity gateway", version="0.1.0", lifespan=lifespan,
+    docs_url="/docs" if config.ENABLE_DOCS else None,
+    redoc_url="/redoc" if config.ENABLE_DOCS else None,
+    openapi_url="/openapi.json" if config.ENABLE_DOCS else None,
+)
 
 
 # --- Security headers -------------------------------------------------------
@@ -113,13 +119,26 @@ def traces(limit: int = 50,
         raise HTTPException(status_code=403, detail={
             "error": "traces_disabled",
             "reason": "set VERITY_ADMIN_KEY to enable trace access"})
-    if x_verity_admin_key != config.ADMIN_KEY:
+    if not hmac.compare_digest(x_verity_admin_key or "", config.ADMIN_KEY):
         raise HTTPException(status_code=401, detail={"error": "unauthorized"})
     return {"traces": recent_traces(max(1, min(limit, 200)))}
 
 
 # Best-effort per-client rate limit (in-memory; per instance on serverless).
 _hits: dict[str, deque] = defaultdict(deque)
+
+
+def _client_key(request: Request) -> str:
+    """Rate-limit bucket key. Behind a proxy (Vercel), request.client is
+    the proxy itself — every visitor would share one bucket — so prefer
+    the first X-Forwarded-For hop, which the platform sets to the real
+    client address."""
+    xff = request.headers.get("x-forwarded-for", "")
+    if xff:
+        first = xff.split(",")[0].strip()
+        if first:
+            return first
+    return request.client.host if request.client else "unknown"
 
 
 def _rate_limited(client: str) -> bool:
@@ -136,7 +155,7 @@ def _rate_limited(client: str) -> bool:
 @app.post("/v1/chat/completions")
 async def chat_completions(req: ChatRequest, request: Request):
     started = time.perf_counter()
-    client = request.client.host if request.client else "unknown"
+    client = _client_key(request)
     if _rate_limited(client):
         raise HTTPException(status_code=429, detail={"error": "rate_limited"})
     user_texts = [m.content for m in req.messages if m.role == "user"]

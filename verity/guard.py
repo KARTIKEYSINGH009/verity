@@ -17,7 +17,7 @@ RULES = {
     "ignore_instructions": r"ignore (all |any |your |previous )?(prior |previous )?instructions",
     "system_prompt_extract": r"(reveal|show|print|output|disclose).{0,40}system prompt",
     "role_hijack": r"you are now (dan|unrestricted|free of|no longer)\b|pretend (you are|to be) (dan|unrestricted|evil)\b|act as (a |an )?DAN",
-    "jailbreak_token": r"\bDAN\b|jailbreak|do anything now",
+    "jailbreak_token": r"jailbreak|do anything now",
     "instruction_override": r"disregard.{0,30}(above|previous|instructions)",
     "prompt_leak": r"repeat.{0,30}(instructions|prompt)",
     "impersonation": r"i am (your|the) (store |shop |branch )?(manager|owner|boss|admin)\b|this is (the )?(owner|manager) speaking|as your developer|admin here\b",

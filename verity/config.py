@@ -1,6 +1,20 @@
 """Runtime configuration, all overridable via environment variables."""
 import os
 
+
+def _int_env(name: str, default: int) -> int:
+    """Parse an integer env var; a malformed value falls back to the
+    default with a warning instead of crashing startup."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        print(f"warning: {name}={raw!r} is not an integer; using {default}")
+        return default
+
+
 UPSTREAM_BASE_URL = os.getenv("VERITY_UPSTREAM_BASE_URL", "https://api.openai.com")
 UPSTREAM_API_KEY = os.getenv("VERITY_UPSTREAM_API_KEY", "")
 MOCK_MODE = os.getenv("VERITY_MOCK_MODE", "true").lower() == "true"
@@ -17,5 +31,11 @@ JUDGE_ENABLED = os.getenv("VERITY_JUDGE_ENABLED", "true").lower() == "true"
 # since traces contain raw prompts and answers.
 ADMIN_KEY = os.getenv("VERITY_ADMIN_KEY", "")
 # Abuse controls for the public chat endpoint.
-MAX_INPUT_CHARS = int(os.getenv("VERITY_MAX_INPUT_CHARS", "20000"))
-RATE_LIMIT_PER_MIN = int(os.getenv("VERITY_RATE_LIMIT_PER_MIN", "120"))
+MAX_INPUT_CHARS = _int_env("VERITY_MAX_INPUT_CHARS", 20000)
+RATE_LIMIT_PER_MIN = _int_env("VERITY_RATE_LIMIT_PER_MIN", 120)
+# Interactive API docs (/docs, /redoc, /openapi.json) are off by default:
+# a public gateway should not publish a map of its own API surface.
+ENABLE_DOCS = os.getenv("VERITY_ENABLE_DOCS", "false").lower() == "true"
+# Trace retention: rows older than this many days are pruned on write,
+# so the SQLite log cannot grow without bound. 0 disables pruning.
+TRACE_RETENTION_DAYS = _int_env("VERITY_TRACE_RETENTION_DAYS", 30)
