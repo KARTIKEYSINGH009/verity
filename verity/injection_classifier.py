@@ -52,7 +52,7 @@ def features(text: str) -> list[str]:
     grams = list(words)
     grams += [f"{a} {b}" for a, b in zip(words, words[1:])]
     padded = f"  {t}  "
-    for n in (3, 4, 5):
+    for n in (3, 4):
         grams += [f"c:{padded[i:i + n]}" for i in range(len(padded) - n + 1)]
     return grams
 
@@ -96,19 +96,11 @@ def load_model(path: str | None = None) -> dict | None:
     """Load the trained weights once; returns None on any failure."""
     global _MODEL, _MODEL_TRIED
     if path is not None:
-        try:
-            with open(path, encoding="utf-8") as fh:
-                return _from_file_format(json.load(fh))
-        except (OSError, ValueError):
-            return None
+        return _load_with_sibling(path)
     if _MODEL_TRIED:
         return _MODEL
     _MODEL_TRIED = True
-    try:
-        with open(_MODEL_PATH, encoding="utf-8") as fh:
-            _MODEL = _from_file_format(json.load(fh))
-    except (OSError, ValueError):
-        _MODEL = None
+    _MODEL = _load_with_sibling(_MODEL_PATH)
     return _MODEL
 
 
@@ -169,8 +161,58 @@ def _from_file_format(raw: dict) -> dict:
     }
 
 
+def _sibling_path(path: str) -> str:
+    return path[:-5] + "_part2.json" if path.endswith(".json") else path
+
+
+def _load_one(path: str) -> dict | None:
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return _from_file_format(json.load(fh))
+    except (OSError, ValueError):
+        return None
+
+
+def _load_with_sibling(path: str) -> dict | None:
+    """Load a model, merging its _part2 sibling when present.
+
+    The trained weights ship split across two files so each stays small;
+    the merge is transparent to callers.
+    """
+    model = _load_one(path)
+    if model is None:
+        return None
+    sibling = _sibling_path(path)
+    if sibling != path:
+        extra = _load_one(sibling)
+        if extra is not None:
+            for c in CLASSES:
+                model["log_prob"][c].update(extra["log_prob"][c])
+            model["vocab_size"] = len(model["log_prob"]["malicious"])
+    return model
+
+
 def save_model(model: dict, path: str) -> None:
-    """Write weights in the compact array format (rounded floats)."""
+    """Write weights in the compact array format (rounded floats), split
+    across the main file and a _part2 sibling so each file stays small."""
+    fmt = _to_file_format(model)
+    n = len(fmt["vocab"])
+    half = (n + 1) // 2
+
+    def part(idxs: list[int]) -> dict:
+        return {
+            "format": 2,
+            "alpha": fmt["alpha"],
+            "vocab_size": len(idxs),
+            "vocab": [fmt["vocab"][i] for i in idxs],
+            "log_prior": fmt["log_prior"],
+            "log_prob": {c: [fmt["log_prob"][c][i] for i in idxs]
+                         for c in CLASSES},
+            "log_prob_oov": fmt["log_prob_oov"],
+        }
+
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as fh:
-        json.dump(_to_file_format(model), fh)
+        json.dump(part(list(range(0, half))), fh)
+    with open(_sibling_path(path), "w", encoding="utf-8") as fh:
+        json.dump(part(list(range(half, n))), fh)
