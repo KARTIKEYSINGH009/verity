@@ -84,7 +84,7 @@ Point your OpenAI client at `http://localhost:8000/v1` instead of
 `https://api.openai.com/v1` — that's the whole integration.
 
 Dashboard: `streamlit run dashboard/app.py`
-Tests: `pytest` (31 passing)
+Tests: `pytest` (63 passing, including a red-team suite covering all abuse families)
 
 ## Configuration
 
