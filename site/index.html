@@ -409,6 +409,24 @@
       *, *::before, *::after { transition: none !important; }
     }
   </style>
+  <link rel="stylesheet" href="/figure.css" />
+  <style>
+    .verity-fig { --anatomy-page: transparent; }
+    .verity-fig .iso-page { max-width: 740px; margin: 0 auto; }
+    .verity-fig .iso-figure { margin: 8px 0 0; }
+    .figure-open { margin: 16px 0 0; text-align: center; font-family: var(--mono); font-size: .86rem; }
+    .figure-open a { color: var(--muted); }
+    @media (prefers-color-scheme: dark) {
+      .iso.verity-fig {
+        --anatomy-card: #131313; --anatomy-text: #a3a3a3; --anatomy-strong: #e6e6e6; --anatomy-muted: #6e6e6e;
+        --anatomy-paper: #131313; --anatomy-face: #1b1b1b; --anatomy-top: #1c1c1c;
+        --anatomy-shade-0: #0f0f0f; --anatomy-shade-1: #121212; --anatomy-shade-2: #151515; --anatomy-shade-3: #181818;
+        --anatomy-lit-top: #262626; --anatomy-lit-shade: #1d1d1d;
+        --anatomy-hi: #d4d4d4; --anatomy-mid: #6a6a6a; --anatomy-lo: #3e3e3e; --anatomy-faint: #2a2a2a; --anatomy-lit: #ffffff;
+        --anatomy-halo: #050505; --anatomy-halo-opacity: .9; --anatomy-dot: #e6e6e6;
+      }
+    }
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -597,6 +615,20 @@
           <div class="layer"><b>Faithfulness judge</b><p>An LLM grades the answer against trusted context, with a deterministic heuristic fallback.</p></div>
           <div class="layer"><b>Trace log</b><p>Inputs, outputs, flags, latency, and faithfulness scores are recorded for review.</p></div>
         </div>
+      </div>
+    </section>
+
+
+    <section class="block figure-block" id="figure">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>The checkpoint, drawn as a machine.</h2>
+          <p>Every prompt rides the same conveyor: screened by the scanner, judged by policy, and only then delivered to the model. Hover or use the arrow keys to run the three cases — an injection, a policy breach, and a clean prompt.</p>
+        </div>
+        <div class="iso verity-fig" data-theme="light">
+<main class="iso-page"><figure class="iso-figure"><div class="iso-plate"><div class="iso-plate-corners" aria-hidden="true"><span class="iso-plate-corner" data-corner="fig">Fig 1</span><span class="iso-plate-corner" data-corner="title">Verity, as an inspection rig</span><span class="iso-plate-corner" data-corner="hint">Hover to send the next prompt</span><span class="iso-plate-corner" data-corner="readout" data-readout>injection · 0.96 · BLOCKED 400 · no model</span></div><div class="iso-stage" id="verity-fig-stage" tabindex="0" role="slider" aria-label="Verity inspection rig: arrow keys step a prompt through the injection, policy and benign cases" aria-valuemin="0" aria-valuemax="2" aria-valuenow="0"></div></div><figcaption class="iso-legend"><span class="iso-keys"><span class="iso-key"><svg class="iso-swatch" data-mark="lit" viewBox="0 0 16 10" aria-hidden="true"><path d="M2 4.5 8 1.5 14 4.5 14 6 8 9 2 6Z"/><path class="iso-swatch-crease" d="M2 4.5 8 7.5 14 4.5"/></svg>Prompt capsule: the request travelling through the gateway</span><span class="iso-key"><svg class="iso-swatch" data-mark="raised" viewBox="0 0 16 10" aria-hidden="true"><path d="M2 4.5 8 1.5 14 4.5 14 6 8 9 2 6Z"/><path class="iso-swatch-crease" d="M2 4.5 8 7.5 14 4.5"/></svg>Scanner dial: injection classifier score — 0.96 blocks, 0.04 passes</span><span class="iso-key"><svg class="iso-swatch" data-mark="edge" viewBox="0 0 16 10" aria-hidden="true"><path d="M1.5 5h13"/></svg>Policy blade: drops only when the business policy forbids the request</span></span><span class="iso-caption">Verity is an AI firewall for LLM apps. Every prompt rides through the scanner (rules plus a classifier trained on 173 attacks in 9 families), then the policy gate, then the model. On 45 unseen prompts it scores 88% recall and 91.7% precision at 0.21 ms. An injection never reaches the model; a refund under a no-refunds policy is stopped by policy, not by the scanner — the same words pass without that policy.</span></figcaption></figure></main>
+        </div>
+        <p class="figure-open"><a href="/figure.html">Open the figure on its own page</a></p>
       </div>
     </section>
 
@@ -864,5 +896,9 @@ client = OpenAI(
       });
     }());
   </script>
+  <script src="/figure-kit.js"></script>
+  <script src="/figure-svg-a.js"></script>
+  <script src="/figure-svg-b.js"></script>
+  <script src="/figure-live.js"></script>
 </body>
 </html>
