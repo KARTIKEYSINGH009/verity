@@ -59,13 +59,25 @@ def _metrics(rows: list[tuple[bool, bool]]) -> dict:
     fp = sum(1 for p, a in rows if p and not a)
     fn = sum(1 for p, a in rows if not p and a)
     tn = sum(1 for p, a in rows if not p and not a)
+    precision = tp / (tp + fp) if tp + fp else None
+    recall = tp / (tp + fn) if tp + fn else None
+    f1 = (2 * precision * recall / (precision + recall)
+          if precision and recall else None)
     return {
         "tp": tp, "fp": fp, "fn": fn, "tn": tn,
-        "recall": round(tp / (tp + fn), 3) if tp + fn else None,
-        "precision": round(tp / (tp + fp), 3) if tp + fp else None,
+        "recall": round(recall, 3) if recall is not None else None,
+        "precision": round(precision, 3) if precision is not None else None,
+        "f1": round(f1, 3) if f1 is not None else None,
         "false_positive_rate": round(fp / (fp + tn), 3) if fp + tn else None,
         "accuracy": round((tp + tn) / len(rows), 3) if rows else None,
     }
+
+
+def _pct(sorted_vals: list[float], q: float) -> float:
+    if not sorted_vals:
+        return 0.0
+    idx = min(len(sorted_vals) - 1, int(q * len(sorted_vals)))
+    return round(sorted_vals[idx], 2)
 
 
 if __name__ == "__main__":
@@ -105,15 +117,73 @@ if __name__ == "__main__":
         verdict = faithfulness_score(context, answer)["verdict"]
         got = "grounded" if verdict == "grounded" else "hallucination"
         faith_rows.append(got == expected)
+    # Precision/recall for unsupported-answer detection (positive class =
+    # hallucination; strict prediction = verdict hallucination_risk).
+    f_tp = f_fp = f_fn = 0
+    for context, answer, expected in FAITHFULNESS_EVAL:
+        verdict = faithfulness_score(context, answer)["verdict"]
+        pred_unsup = verdict == "hallucination_risk"
+        actual_unsup = expected == "hallucination"
+        if pred_unsup and actual_unsup:
+            f_tp += 1
+        elif pred_unsup and not actual_unsup:
+            f_fp += 1
+        elif not pred_unsup and actual_unsup:
+            f_fn += 1
+    f_prec = f_tp / (f_tp + f_fp) if f_tp + f_fp else None
+    f_rec = f_tp / (f_tp + f_fn) if f_tp + f_fn else None
     faithfulness = {
         "cases": len(FAITHFULNESS_EVAL),
         "verdict_accuracy": round(sum(faith_rows) / len(faith_rows), 3),
+        "unsupported_precision": round(f_prec, 3) if f_prec is not None else None,
+        "unsupported_recall": round(f_rec, 3) if f_rec is not None else None,
         "method": "deterministic heuristic scorer (the LLM judge's offline "
-                  "fallback); the live-mode judge itself is not measured "
-                  "here because it depends on the operator's model and key.",
+                  "fallback), 8 hand-labelled cases — small-sample signal, "
+                  "not a production SLA. The live-mode judge itself is not "
+                  "measured here because it depends on the operator's model "
+                  "and key.",
+    }
+
+    # Threshold sweep on the VALIDATION set only (never the test set).
+    from validation_set import VALIDATION_SET
+    sweep = {}
+    for thr in (0.5, 0.65, 0.75, 0.85, 0.9):
+        rows = []
+        for text, label in VALIDATION_SET:
+            p = probability_malicious(text)
+            rows.append(((p is not None and p >= thr),
+                         label == "malicious"))
+        m = _metrics(rows)
+        sweep[str(thr)] = {"recall": m["recall"],
+                           "false_positive_rate": m["false_positive_rate"]}
+
+    import subprocess
+    from datetime import datetime, timezone
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True,
+            cwd=os.path.join(os.path.dirname(__file__), "..")).stdout.strip()
+    except Exception:
+        commit = "unknown"
+    lat_sorted = sorted(latencies)
+    meta = {
+        "commit": commit,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "classifier": "naive-bayes word(1,2)+char(3,4) n-grams, normalized input",
+        "threshold": CLASSIFIER_THRESHOLD,
+        "train_examples": len(DATASET) + len(load_corrections()),
+        "validation_examples": len(VALIDATION_SET),
+        "test_examples": len(EVAL_SET),
+        "latency_ms": {"p50": _pct(lat_sorted, 0.5),
+                       "p95": _pct(lat_sorted, 0.95),
+                       "p99": _pct(lat_sorted, 0.99),
+                       "mean": round(sum(latencies) / len(latencies), 2)},
+        "threshold_sweep_on_validation": sweep,
     }
 
     results = {
+        "meta": meta,
         "dataset": {
             "total": len(EVAL_SET),
             "malicious": sum(1 for _, l, _ in EVAL_SET if l == "malicious"),

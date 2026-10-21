@@ -12,3 +12,10 @@ BLOCK_ON_INJECTION = os.getenv("VERITY_BLOCK_ON_INJECTION", "true").lower() == "
 # LLM-as-judge settings (milestone 2).
 JUDGE_MODEL = os.getenv("VERITY_JUDGE_MODEL", "gpt-4o-mini")
 JUDGE_ENABLED = os.getenv("VERITY_JUDGE_ENABLED", "true").lower() == "true"
+# Admin key required to read /v1/traces. Empty (the default) disables the
+# traces endpoint entirely — the safe default for public deployments,
+# since traces contain raw prompts and answers.
+ADMIN_KEY = os.getenv("VERITY_ADMIN_KEY", "")
+# Abuse controls for the public chat endpoint.
+MAX_INPUT_CHARS = int(os.getenv("VERITY_MAX_INPUT_CHARS", "20000"))
+RATE_LIMIT_PER_MIN = int(os.getenv("VERITY_RATE_LIMIT_PER_MIN", "120"))

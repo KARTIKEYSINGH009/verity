@@ -133,6 +133,7 @@ def _to_file_format(model: dict) -> dict:
     vocab = sorted(model["log_prob"]["malicious"].keys())
     return {
         "format": 2,
+        "meta": model.get("meta", {}),
         "alpha": model["alpha"],
         "vocab_size": len(vocab),
         "vocab": vocab,
@@ -151,6 +152,7 @@ def _from_file_format(raw: dict) -> dict:
         return raw  # legacy dict format
     vocab = raw["vocab"]
     return {
+        "meta": raw.get("meta", {}),
         "alpha": raw["alpha"],
         "vocab_size": raw["vocab_size"],
         "log_prior": raw["log_prior"],
@@ -202,6 +204,7 @@ def save_model(model: dict, path: str) -> None:
     def part(idxs: list[int]) -> dict:
         return {
             "format": 2,
+            "meta": fmt.get("meta", {}),
             "alpha": fmt["alpha"],
             "vocab_size": len(idxs),
             "vocab": [fmt["vocab"][i] for i in idxs],

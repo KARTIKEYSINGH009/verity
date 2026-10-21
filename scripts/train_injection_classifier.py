@@ -42,10 +42,46 @@ def load_corrections() -> list[tuple[str, str]]:
     return rows
 
 
+def sanitize_corrections(
+        rows: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """Learning-guard controls applied before any correction may train:
+    deduplicate by normalized text, and reject anything that collides
+    with the held-out evaluation set (contamination would inflate the
+    benchmark and invalidate it)."""
+    from eval_set import EVAL_SET
+    from verity.injection_classifier import normalize
+    eval_texts = {normalize(t) for t, _, _ in EVAL_SET}
+    seen: set[str] = set()
+    clean: list[tuple[str, str]] = []
+    for text, label in rows:
+        key = normalize(text)
+        if key in seen:
+            print(f"  correction skipped (duplicate): {text[:60]!r}")
+            continue
+        if key in eval_texts:
+            print(f"  correction REJECTED (matches held-out eval): {text[:60]!r}")
+            continue
+        seen.add(key)
+        clean.append((text, label))
+    return clean
+
+
 if __name__ == "__main__":
-    corrections = load_corrections()
+    corrections = sanitize_corrections(load_corrections())
     examples = DATASET + corrections
     model = train_model(examples)
+    import hashlib
+    from datetime import datetime, timezone
+    model["meta"] = {
+        "trained_examples": len(examples),
+        "curated": len(DATASET),
+        "corrections": len(corrections),
+        "dataset_sha256": hashlib.sha256(
+            "\n".join(sorted(t for t, _ in examples)).encode()
+        ).hexdigest()[:16],
+        "trained_at": datetime.now(timezone.utc).isoformat(),
+        "features": "word(1,2)+char(3,4) n-grams, normalized input",
+    }
     save_model(model, OUT_PATH)
 
     correct = sum(

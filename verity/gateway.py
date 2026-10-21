@@ -5,10 +5,11 @@ point your client at http://<verity-host>:8000/v1 instead of
 https://api.openai.com/v1. Everything else stays the same.
 """
 import time
+from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from . import config
@@ -74,15 +75,50 @@ def health():
 
 
 @app.get("/v1/traces")
-def traces(limit: int = 50):
-    return {"traces": recent_traces(limit)}
+def traces(limit: int = 50,
+           x_verity_admin_key: str | None = Header(default=None)):
+    """Trace access is admin-only: traces contain raw prompts and answers.
+
+    With no VERITY_ADMIN_KEY configured the endpoint is disabled (403) —
+    the safe default for public deployments. With a key set, callers must
+    present it in the X-Verity-Admin-Key header (401 otherwise).
+    """
+    if not config.ADMIN_KEY:
+        raise HTTPException(status_code=403, detail={
+            "error": "traces_disabled",
+            "reason": "set VERITY_ADMIN_KEY to enable trace access"})
+    if x_verity_admin_key != config.ADMIN_KEY:
+        raise HTTPException(status_code=401, detail={"error": "unauthorized"})
+    return {"traces": recent_traces(max(1, min(limit, 200)))}
+
+
+# Best-effort per-client rate limit (in-memory; per instance on serverless).
+_hits: dict[str, deque] = defaultdict(deque)
+
+
+def _rate_limited(client: str) -> bool:
+    now = time.monotonic()
+    window = _hits[client]
+    while window and now - window[0] > 60:
+        window.popleft()
+    if len(window) >= config.RATE_LIMIT_PER_MIN:
+        return True
+    window.append(now)
+    return False
 
 
 @app.post("/v1/chat/completions")
-async def chat_completions(req: ChatRequest):
+async def chat_completions(req: ChatRequest, request: Request):
     started = time.perf_counter()
+    client = request.client.host if request.client else "unknown"
+    if _rate_limited(client):
+        raise HTTPException(status_code=429, detail={"error": "rate_limited"})
     user_texts = [m.content for m in req.messages if m.role == "user"]
     combined = "\n".join(user_texts)
+    if len(combined) > config.MAX_INPUT_CHARS:
+        raise HTTPException(status_code=413, detail={
+            "error": "request_too_large",
+            "limit_chars": config.MAX_INPUT_CHARS})
 
     # 1. Guard: screen for prompt injection before anything reaches a model.
     verdict = screen(combined)
