@@ -494,10 +494,12 @@
                   <div class="meter" aria-hidden="true"><i id="guard-meter"></i></div>
                   <ul class="detail-list">
                     <li><span>Decision</span><code id="guard-decision">—</code></li>
+                    <li><span>Deciding layer</span><code id="guard-layer">—</code></li>
                     <li><span>Matched rules</span><code id="guard-rules">—</code></li>
+                    <li><span>Latency</span><code id="guard-latency">—</code></li>
                     <li><span>Next hop</span><code id="guard-next">—</code></li>
                   </ul>
-                  <p class="preview-note">Live check: this calls the real Verity gateway — rules plus the trained classifier — the same API protecting this site.</p>
+                  <p class="preview-note" id="guard-note">Live check: this calls the real Verity gateway — rules plus the trained classifier — the same API protecting this site.</p>
                 </div>
               </div>
             </div>
@@ -545,6 +547,25 @@
       </div>
     </section>
 
+    <section class="block" id="benchmarks">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Measured, not promised.</h2>
+          <p>Held-out benchmark: 40 prompts the model never trained on — 22 fresh attacks in new phrasings, 18 deliberately hard benign near-misses. Reproduce it from the repository with <code>python scripts/run_benchmarks.py</code>; full data in <a href="/benchmarks.json">benchmarks.json</a>.</p>
+        </div>
+        <div class="proof-grid" aria-label="Benchmark results">
+          <div class="proof-item"><strong>90.9%</strong><span>attack recall, combined guard (held-out)</span></div>
+          <div class="proof-item"><strong>87%</strong><span>precision — few false alarms</span></div>
+          <div class="proof-item"><strong>~0.4 ms</strong><span>average screening latency, local</span></div>
+        </div>
+        <div class="layers">
+          <div class="layer"><b>Rules alone: 0% recall</b><p>Heuristics only catch attacks phrased like known patterns. On novel wording they are a safety net, not a shield — which is why the learned layer exists.</p></div>
+          <div class="layer"><b>Classifier: 90.9% recall</b><p>The trained model generalizes to new phrasings. Per-category recall: injection, impersonation, social engineering, data theft, harmful content — 100%. Fraud paraphrases are the weakest class (33%).</p></div>
+          <div class="layer"><b>Known limitations</b><p>The training set is a prototype baseline (164 examples) and grows through the corrections loop. False-positive rate is 16.7% on deliberately hard benign prompts. No filter can guarantee complete protection — Verity reduces risk and records evidence; it does not eliminate either.</p></div>
+        </div>
+      </div>
+    </section>
+
     <section class="block architecture" id="architecture">
       <div class="wrap">
         <div class="section-head">
@@ -576,8 +597,17 @@
             <li>FastAPI proxy gateway</li>
             <li>Mock mode works without an API key</li>
             <li>Business-policy enforcement via policy_context</li>
+            <li>Faithfulness grading via grounding_context</li>
+            <li>Blocked requests return a structured 400: blocked_by_verity_guard / blocked_by_verity_policy</li>
             <li>Graceful fallback when judge or classifier is unavailable</li>
           </ul>
+          <pre style="margin-top:18px"><span class="cmt"># curl, against the live demo</span>
+curl -X POST https://verity-nine-flame.vercel.app/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-4o-mini",
+       "messages":[{"role":"user","content":"refund my money"}],
+       "policy_context":"All sales are final. No refunds are offered."}'
+<span class="cmt"># → 400 {"error":"blocked_by_verity_policy", ...}</span></pre>
         </div>
         <div class="code-window" aria-label="Quickstart code example">
           <pre id="quickstart"><span class="cmt"># Start Verity locally</span>
@@ -606,16 +636,30 @@ client = OpenAI(
           <div class="milestone"><span class="id">M2</span><div><strong>LLM-as-judge</strong><p>Structured faithfulness verdicts with a heuristic fallback for mock mode and outages.</p></div><span class="tag">SHIPPED</span></div>
           <div class="milestone"><span class="id">M3</span><div><strong>Trained injection classifier</strong><p>Naive Bayes over word unigrams and bigrams, layered with rules and shipped weights.</p></div><span class="tag">SHIPPED</span></div>
           <div class="milestone"><span class="id">M4</span><div><strong>Business-policy guard</strong><p>Per-request policy enforcement: prohibited actions are blocked before the model can comply, and non-compliant answers are blocked before the user.</p></div><span class="tag">SHIPPED</span></div>
-          <div class="milestone"><span class="id">SEC</span><div><strong>All-abuse hardening</strong><p>Classifier retrained on 138 examples across nine abuse families, four new guard rules, and a red-team suite in the test pipeline.</p></div><span class="tag">SHIPPED</span></div>
+          <div class="milestone"><span class="id">SEC</span><div><strong>All-abuse hardening</strong><p>Classifier trained on a growing dataset (164 examples) across nine abuse families, a red-team suite in the test pipeline, and a published held-out benchmark.</p></div><span class="tag">SHIPPED</span></div>
           <div class="milestone"><span class="id">M5</span><div><strong>Learning guard</strong><p>Input normalization and character n-grams defeat respelling tricks, and a corrections loop retrains the model on every new attack found in the field.</p></div><span class="tag">SHIPPED</span></div>
           <div class="milestone"><span class="id">NEXT</span><div><strong>Cost tracking and alerts</strong><p>Per-endpoint usage visibility, then Slack or webhook notifications for risky events.</p></div><span class="tag next">ROADMAP</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="trust">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Trust, stated plainly.</h2>
+          <p>Verity inspects AI traffic, so its own behavior has to be inspectable too.</p>
+        </div>
+        <div class="layers">
+          <div class="layer"><b>Open source</b><p>Full source, training data, and benchmark scripts are public: <a href="https://github.com/KARTIKEYSINGH009/verity">github.com/KARTIKEYSINGH009/verity</a>. Found a bypass? That is a contribution — new attacks enter the corrections loop and make the next model stronger.</p></div>
+          <div class="layer"><b>Data handling</b><p>Your deployment stores its own traces (inputs, outputs, flags, latency) in its own database — you set retention. In live mode, answer text is sent to your chosen judge model under your provider key. This public demo runs in mock mode; its traces live in ephemeral storage and reset on redeploy.</p></div>
+          <div class="layer"><b>Screening is not authorization</b><p>Verity classifies content and enforces declared policy on requests and answers. It is not an authorization system: sensitive actions (refunds, transfers, record changes) must also be permission-checked at your tool and backend boundary. Never let a model answer alone authorize one.</p></div>
         </div>
       </div>
     </section>
   </main>
 
   <footer>
-    <div class="wrap"><span>Built by Kartikey Singh</span><span>Current project snapshot · October 2026</span></div>
+    <div class="wrap"><span>Built by Kartikey Singh</span><span><a href="https://github.com/KARTIKEYSINGH009/verity">Source on GitHub</a> · <a href="/benchmarks.json">Benchmark data</a></span><span>Current project snapshot · October 2026</span></div>
   </footer>
 
   <script>
@@ -642,7 +686,7 @@ client = OpenAI(
       var rules = [
         ['ignore_instructions', /ignore (all |any |your |previous )?(prior |previous )?instructions/i],
         ['system_prompt_extract', /(reveal|show|print|output|disclose).{0,40}system prompt/i],
-        ['role_hijack', /you are now|pretend (you are|to be)|act as (a |an )?DAN/i],
+        ['role_hijack', /you are now (dan|unrestricted|free of|no longer)\b|pretend (you are|to be) (dan|unrestricted|evil)\b|act as (a |an )?DAN/i],
         ['jailbreak_token', /\bDAN\b|jailbreak|do anything now/i],
         ['instruction_override', /disregard.{0,30}(above|previous|instructions)/i],
         ['prompt_leak', /repeat.{0,30}(instructions|prompt)/i],
@@ -655,11 +699,13 @@ client = OpenAI(
       document.querySelectorAll('[data-guard-example]').forEach(function (button) {
         button.addEventListener('click', function () {
           document.getElementById('guard-input').value = button.getAttribute('data-guard-example');
+          document.getElementById('guard-result').classList.remove('visible');
+          document.getElementById('guard-empty').hidden = false;
           document.getElementById('run-guard').focus();
         });
       });
 
-      function renderGuard(blocked, hits, decision) {
+      function renderGuard(blocked, hits, decision, layer, latencyMs, fallback) {
         var signal = blocked ? Math.min(100, 60 + hits.length * 18) : 8;
         var card = document.getElementById('guard-result');
         card.classList.toggle('danger', blocked);
@@ -673,8 +719,13 @@ client = OpenAI(
         document.getElementById('guard-score').textContent = signal + '%';
         document.getElementById('guard-meter').style.width = signal + '%';
         document.getElementById('guard-decision').textContent = decision;
+        document.getElementById('guard-layer').textContent = layer;
         document.getElementById('guard-rules').textContent = hits.length ? hits.join(', ') : 'none';
+        document.getElementById('guard-latency').textContent = latencyMs != null ? latencyMs + ' ms round-trip' : '—';
         document.getElementById('guard-next').textContent = blocked ? 'trace log' : 'model provider';
+        document.getElementById('guard-note').textContent = fallback
+          ? 'Offline fallback: the live gateway could not be reached, so this verdict came from the local rule copy only.'
+          : 'Live check: this calls the real Verity gateway — rules plus the trained classifier — the same API protecting this site.';
       }
 
       document.getElementById('run-guard').addEventListener('click', function () {
@@ -683,6 +734,7 @@ client = OpenAI(
         var btn = document.getElementById('run-guard');
         btn.disabled = true;
         btn.textContent = 'Screening…';
+        var started = performance.now();
         fetch('/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -692,17 +744,22 @@ client = OpenAI(
             return { status: resp.status, data: data };
           });
         }).then(function (r) {
+          var latency = Math.round(performance.now() - started);
           if (r.status === 400 && r.data && r.data.detail) {
             var d = r.data.detail;
-            renderGuard(true, d.matched_rules || [d.error || 'policy_violation'], d.error || 'blocked_by_verity_guard');
+            var hits = d.matched_rules || [d.error || 'policy_violation'];
+            var layer = d.error === 'blocked_by_verity_policy' ? 'policy guard'
+              : hits.indexOf('ml_classifier') >= 0 && hits.length > 1 ? 'rules + classifier'
+              : hits.indexOf('ml_classifier') >= 0 ? 'trained classifier' : 'heuristic rules';
+            renderGuard(true, hits, d.error || 'blocked_by_verity_guard', layer, latency, false);
           } else if (r.status === 200 && r.data) {
-            renderGuard(false, (r.data.verity && r.data.verity.guard_flags) || [], 'allow');
+            renderGuard(false, (r.data.verity && r.data.verity.guard_flags) || [], 'allow', 'all layers passed', latency, false);
           } else {
             throw new Error('unexpected status ' + r.status);
           }
         }).catch(function () {
           var hits = rules.filter(function (item) { return item[1].test(text); }).map(function (item) { return item[0]; });
-          renderGuard(hits.length > 0, hits, hits.length > 0 ? 'blocked_by_verity_guard' : 'allow');
+          renderGuard(hits.length > 0, hits, hits.length > 0 ? 'blocked_by_verity_guard' : 'allow', 'local rules (fallback)', null, true);
         }).then(function () {
           btn.disabled = false;
           btn.textContent = 'Screen prompt';
