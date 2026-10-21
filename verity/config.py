@@ -59,3 +59,8 @@ def _keys_env() -> list[str]:
 
 CLIENT_KEYS = _keys_env()
 ALLOW_OPEN = os.getenv("VERITY_ALLOW_OPEN", "false").lower() == "true"
+# Per-field size caps for the optional contexts (audit F7). The message
+# cap above cannot see these fields, so without their own caps a caller
+# could smuggle an unbounded payload past the size limit in a context.
+MAX_POLICY_CHARS = _int_env("VERITY_MAX_POLICY_CHARS", 4000)
+MAX_GROUNDING_CHARS = _int_env("VERITY_MAX_GROUNDING_CHARS", 50000)

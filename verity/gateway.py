@@ -203,17 +203,38 @@ async def chat_completions(req: ChatRequest, request: Request,
     client = _client_key(request)
     if _rate_limited(client):
         raise HTTPException(status_code=429, detail={"error": "rate_limited"})
-    user_texts = [m.content for m in req.messages if m.role == "user"]
-    combined = "\n".join(user_texts)
+    combined = "\n".join(m.content for m in req.messages)
     if len(combined) > config.MAX_INPUT_CHARS:
         raise HTTPException(status_code=413, detail={
             "error": "request_too_large",
             "limit_chars": config.MAX_INPUT_CHARS})
+    if len(req.policy_context) > config.MAX_POLICY_CHARS:
+        raise HTTPException(status_code=413, detail={
+            "error": "context_too_large", "field": "policy_context",
+            "limit_chars": config.MAX_POLICY_CHARS})
+    if len(req.grounding_context) > config.MAX_GROUNDING_CHARS:
+        raise HTTPException(status_code=413, detail={
+            "error": "context_too_large", "field": "grounding_context",
+            "limit_chars": config.MAX_GROUNDING_CHARS})
 
-    # 1. Guard: screen for prompt injection before anything reaches a model.
-    verdict = screen(combined)
-    flags = verdict["signals"]
-    if verdict["blocked"] and config.BLOCK_ON_INJECTION:
+    # 1. Guard: screen EVERY message, whatever its role (audit F7).
+    # Screening only user messages let an injection ride in on a system,
+    # assistant, or tool message — pasted into a RAG template, say — and
+    # reach the model unscreened. Signals from all messages are merged;
+    # the first blocking message's role is recorded in the flags so the
+    # trace shows where the attack rode in.
+    flags: list[str] = []
+    blocked_role: str | None = None
+    for m in req.messages:
+        v = screen(m.content)
+        for s in v["signals"]:
+            if s not in flags:
+                flags.append(s)
+        if v["blocked"] and blocked_role is None:
+            blocked_role = m.role
+    if blocked_role is not None:
+        flags.append(f"role:{blocked_role}")
+    if blocked_role is not None and config.BLOCK_ON_INJECTION:
         log_trace(req.model, combined, "", 0.0, blocked=True, flags=flags)
         raise HTTPException(status_code=400, detail={
             "error": "blocked_by_verity_guard", "matched_rules": flags})

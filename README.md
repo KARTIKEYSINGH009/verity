@@ -112,7 +112,7 @@ Point your OpenAI client at `http://localhost:8000/v1` instead of
 `https://api.openai.com/v1` — that's the whole integration.
 
 Dashboard: `streamlit run dashboard/app.py`
-Tests: `pytest` (108 passing, including a red-team suite covering all abuse families)
+Tests: `pytest` (120 passing, including a red-team suite covering all abuse families)
 
 ## Configuration
 
@@ -128,7 +128,9 @@ All via environment variables:
 | `VERITY_JUDGE_ENABLED` | `true` | Toggle LLM-as-judge scoring |
 | `VERITY_DB_PATH` | `verity.db` | Trace database path (auto-falls back to temp dir when unwritable) |
 | `VERITY_ADMIN_KEY` | — (unset) | Key required to read `/v1/traces` via the `X-Verity-Admin-Key` header. **Unset = traces endpoint disabled (403)** — the safe default, since traces contain raw prompts and answers |
-| `VERITY_MAX_INPUT_CHARS` | `20000` | Combined user-input size cap; larger requests get `413 request_too_large` |
+| `VERITY_MAX_INPUT_CHARS` | `20000` | Combined message size cap (all roles); larger requests get `413 request_too_large` |
+| `VERITY_MAX_POLICY_CHARS` | `4000` | `policy_context` size cap; larger gets `413 context_too_large` |
+| `VERITY_MAX_GROUNDING_CHARS` | `50000` | `grounding_context` size cap; larger gets `413 context_too_large` |
 | `VERITY_RATE_LIMIT_PER_MIN` | `120` | Per-client request cap on the chat endpoint (`429 rate_limited` beyond it; in-memory, per instance) |
 | `VERITY_CLIENT_KEYS` | — (unset) | Comma-separated client API keys for `/v1/chat/completions` — one per client; clients send theirs as `Authorization: Bearer <key>` (the OpenAI client's `api_key`). Unset = endpoint open (demo/local default) |
 | `VERITY_CLIENT_KEY` | — (unset) | A single client key; merged with `VERITY_CLIENT_KEYS` |
@@ -155,11 +157,21 @@ All via environment variables:
   flagged requests are rejected with a structured `400`; with it off, they
   pass through carrying `verity.guard_flags` for downstream handling.
   Policy violations always reject (request side and response side).
-- **Judge failure behavior:** if the judge model errors or is unconfigured,
-  scoring falls back to the heuristic and the response's
+- **Judge failure behavior:** if the faithfulness judge errors or is
+  unconfigured, scoring falls back to the heuristic and the response's
   `verity.faithfulness.method` says so explicitly — a fallback is never
-  silently presented as a judge verdict. Faithfulness scores are
+  silently presented as a judge verdict. The **policy** judge is
+  stricter: in live mode, if it cannot be reached, the response is
+  withheld (`400 policy_violation_in_response`, reason "fail closed")
+  rather than waved through unchecked. Faithfulness scores are
   estimates, not guarantees of truth.
+- **Screening scope:** the guard screens *every* message in the
+  request — system, user, assistant, and tool roles alike — because an
+  injection can ride in on any of them (a poisoned RAG template, pasted
+  tool output). The trace flags record the role a block rode in on
+  (e.g. `role:system`). The policy and grounding contexts the guard
+  cannot see through the message cap carry their own size caps
+  (`VERITY_MAX_POLICY_CHARS`, `VERITY_MAX_GROUNDING_CHARS`).
 - **Retention:** traces live in the operator's own SQLite database
   (`VERITY_DB_PATH`); retention is the operator's policy — delete or
   rotate the file. On Vercel the DB sits in `/tmp` and resets on
