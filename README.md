@@ -119,13 +119,14 @@ Reproduce: `python scripts/run_benchmarks.py` (writes `site/benchmarks.json`).
 | Mode | Recall | Precision | False-positive rate |
 | --- | --- | --- | --- |
 | Rules only | 0.0 | — | 0.0 |
-| Classifier only | 0.909 | 0.87 | 0.167 |
-| Combined (production) | 0.909 | 0.87 | 0.167 |
+| Classifier only | 0.909 | 0.909 | 0.111 |
+| Combined (production) | 0.909 | 0.909 | 0.111 |
 
 Per-category recall (combined): injection, impersonation, social
-engineering, data theft, and harmful content at 1.0; fraud paraphrases are
-the known weak class (0.33) and the top priority for dataset growth.
-Average screening latency ≈ 0.4 ms locally (screening only, excluding the
+engineering, and data theft at 1.0; fraud (0.67) and harmful-content
+paraphrases (0.5) are the known weak classes and the top priority for
+dataset growth.
+Average screening latency ≈ 0.5 ms locally (screening only, excluding the
 model provider call). Rules alone catch known phrasings deterministically;
 generalization to new phrasings comes from the trained layer. No filter
 guarantees complete protection — Verity's job is risk reduction plus
@@ -158,7 +159,7 @@ tests/                     Test suite
 - [x] Trained injection classifier (milestone 3; Naive Bayes on word n-grams, heuristics kept as layer + fallback)
 - [x] Live deployment (Vercel; website + API in one deployment)
 - [x] Business-policy guard (milestone 4; request + response enforcement, LLM policy judge in live mode)
-- [x] All-abuse hardening (growing dataset — 164 examples — across nine abuse families, 11 guard rules, red-team suite, published held-out benchmark)
+- [x] All-abuse hardening (growing dataset — 173 examples — across nine abuse families, 11 guard rules, red-team suite, published held-out benchmark)
 - [x] Learning guard (milestone 5; normalization + character n-grams, corrections loop retrains on field-found attacks)
 - [ ] Cost tracking per endpoint
 - [ ] Alerting (Slack / webhook)
