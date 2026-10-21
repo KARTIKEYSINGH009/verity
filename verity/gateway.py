@@ -30,6 +30,32 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Verity gateway", version="0.1.0", lifespan=lifespan)
 
 
+# --- Security headers -------------------------------------------------------
+# The landing page is one self-contained file (inline CSS/JS, same-origin
+# fetches to /v1 and /benchmarks.json), so the CSP can stay tight: 'self'
+# plus inline style/script, data: images/fonts, and no framing at all.
+_SECURITY_HEADERS = {
+    "Content-Security-Policy": (
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+        "font-src 'self' data:; connect-src 'self'; "
+        "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    ),
+    "X-Frame-Options": "DENY",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+}
+
+
+@app.middleware("http")
+async def _security_headers(request: Request, call_next):
+    response = await call_next(request)
+    for name, value in _SECURITY_HEADERS.items():
+        response.headers.setdefault(name, value)
+    return response
+
+
 class Message(BaseModel):
     role: str
     content: str
