@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from . import config
-from .guard import detect_injection
+from .guard import screen
 from .judge import judge_faithfulness
 from .scoring import faithfulness_score
 from .store import init_db, log_trace, recent_traces
@@ -81,8 +81,9 @@ async def chat_completions(req: ChatRequest):
     combined = "\n".join(user_texts)
 
     # 1. Guard: screen for prompt injection before anything reaches a model.
-    flags = detect_injection(combined)
-    if flags and config.BLOCK_ON_INJECTION:
+    verdict = screen(combined)
+    flags = verdict["signals"]
+    if verdict["blocked"] and config.BLOCK_ON_INJECTION:
         log_trace(req.model, combined, "", 0.0, blocked=True, flags=flags)
         raise HTTPException(status_code=400, detail={
             "error": "blocked_by_verity_guard", "matched_rules": flags})
@@ -116,3 +117,16 @@ async def chat_completions(req: ChatRequest):
     result.setdefault("verity", {}).update(
         {"guard_flags": flags, "faithfulness": score})
     return result
+
+
+# Serve the landing page (site/) at the root URL when deployed (e.g. Vercel),
+# so one deployment is both the website and the live gateway. Mounted last so
+# /health and /v1/* always win over the static files.
+from pathlib import Path
+
+from fastapi.staticfiles import StaticFiles
+
+_site_dir = Path(__file__).resolve().parent.parent / "site"
+if _site_dir.is_dir():
+    app.mount("/", StaticFiles(directory=str(_site_dir), html=True),
+              name="site")
