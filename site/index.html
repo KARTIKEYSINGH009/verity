@@ -561,7 +561,7 @@
         <div class="layers">
           <div class="layer"><b>Rules alone: 0% recall</b><p>Heuristics only catch attacks phrased like known patterns. On novel wording they are a safety net, not a shield — which is why the learned layer exists.</p></div>
           <div class="layer"><b>Classifier: 90.9% recall</b><p>The trained model generalizes to new phrasings. Per-category recall: injection, impersonation, social engineering, data theft, harmful content — 100%. Fraud (67%) and harmful-content paraphrases (50%) are the weakest classes.</p></div>
-          <div class="layer"><b>Known limitations</b><p>The training set is a prototype baseline (173 examples) and grows through the corrections loop. False-positive rate is 11.1% on deliberately hard benign prompts. No filter can guarantee complete protection — Verity reduces risk and records evidence; it does not eliminate either.</p></div>
+          <div class="layer"><b>Known limitations</b><p>The training set is a prototype baseline (173 examples) and grows through the corrections loop. False-positive rate is 11.1% on deliberately hard benign prompts. The faithfulness heuristic (the judge’s offline fallback) scores 75% verdict accuracy on an 8-case mini-eval in benchmarks.json; the LLM judge is primary in live mode. No filter can guarantee complete protection — Verity reduces risk and records evidence; it does not eliminate either.</p></div>
         </div>
       </div>
     </section>

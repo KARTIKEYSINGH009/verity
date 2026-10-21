@@ -77,7 +77,7 @@ def judge_faithfulness(context: str, answer: str) -> dict:
         base["method"] = "heuristic (mock mode)"
         base["rationale"] = (
             f"{base['grounded_sentences']}/{base['total_sentences']} "
-            "sentences share content words with context")
+            "sentences are at least half-supported by the context")
         return base
     raw = _call_judge_model(build_judge_prompt(context, answer))
     result = parse_judge_response(raw)
