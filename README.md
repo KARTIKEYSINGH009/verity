@@ -265,4 +265,4 @@ MIT — see [LICENSE](LICENSE).
 
 ---
 
-Built by [Kartikey Singh](https://github.com/KARTIKEYSINGH009) — Founder @ Verity & Crewly · CSE (AI/ML) @ VIT Bhopal.
+Built by [Kartikey Singh](https://github.com/KARTIKEYSINGH009) — Founder @ Verity
