@@ -36,6 +36,44 @@ app = FastAPI(
 )
 
 
+# --- Client authentication (audit F2) ---------------------------------------
+
+
+def _client_authorized(authorization: str | None) -> bool:
+    """True when the caller may use the chat endpoint.
+
+    With no client keys configured the endpoint is open — the right
+    default for the public mock demo and local development. With keys
+    configured, the caller must present one as a Bearer token (which is
+    what the OpenAI client sends when its api_key is the Verity key).
+    Comparisons are timing-safe.
+    """
+    keys = config.CLIENT_KEYS
+    if not keys:
+        return True
+    if not authorization or not authorization.startswith("Bearer "):
+        return False
+    token = authorization[len("Bearer "):].strip()
+    return any(hmac.compare_digest(token, k) for k in keys)
+
+
+def _enforce_startup_policy() -> None:
+    """A live (non-mock) deployment must not serve an open endpoint:
+    anyone could spend the operator's upstream API budget. Refuse to
+    start unless client keys are configured or the operator has
+    explicitly accepted an open endpoint with VERITY_ALLOW_OPEN=true.
+    """
+    if not config.MOCK_MODE and not config.CLIENT_KEYS and not config.ALLOW_OPEN:
+        raise RuntimeError(
+            "Verity live mode requires client API keys: set "
+            "VERITY_CLIENT_KEYS (comma-separated) or VERITY_CLIENT_KEY, "
+            "or set VERITY_ALLOW_OPEN=true to run an open endpoint "
+            "deliberately.")
+
+
+_enforce_startup_policy()
+
+
 # --- Security headers -------------------------------------------------------
 # The landing page is one self-contained file (inline CSS/JS, same-origin
 # fetches to /v1 and /benchmarks.json), so the CSP can stay tight: 'self'
@@ -103,7 +141,8 @@ async def _upstream_completion(payload: dict) -> dict:
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "mock_mode": config.MOCK_MODE}
+    return {"status": "ok", "mock_mode": config.MOCK_MODE,
+            "client_auth": bool(config.CLIENT_KEYS)}
 
 
 @app.get("/v1/traces")
@@ -153,8 +192,14 @@ def _rate_limited(client: str) -> bool:
 
 
 @app.post("/v1/chat/completions")
-async def chat_completions(req: ChatRequest, request: Request):
+async def chat_completions(req: ChatRequest, request: Request,
+                           authorization: str | None = Header(default=None)):
     started = time.perf_counter()
+    if not _client_authorized(authorization):
+        raise HTTPException(status_code=401, detail={
+            "error": "invalid_api_key",
+            "reason": "present your Verity client key as "
+                      "'Authorization: Bearer <key>'"})
     client = _client_key(request)
     if _rate_limited(client):
         raise HTTPException(status_code=429, detail={"error": "rate_limited"})

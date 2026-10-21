@@ -130,13 +130,27 @@ All via environment variables:
 | `VERITY_ADMIN_KEY` | — (unset) | Key required to read `/v1/traces` via the `X-Verity-Admin-Key` header. **Unset = traces endpoint disabled (403)** — the safe default, since traces contain raw prompts and answers |
 | `VERITY_MAX_INPUT_CHARS` | `20000` | Combined user-input size cap; larger requests get `413 request_too_large` |
 | `VERITY_RATE_LIMIT_PER_MIN` | `120` | Per-client request cap on the chat endpoint (`429 rate_limited` beyond it; in-memory, per instance) |
+| `VERITY_CLIENT_KEYS` | — (unset) | Comma-separated client API keys for `/v1/chat/completions` — one per client; clients send theirs as `Authorization: Bearer <key>` (the OpenAI client's `api_key`). Unset = endpoint open (demo/local default) |
+| `VERITY_CLIENT_KEY` | — (unset) | A single client key; merged with `VERITY_CLIENT_KEYS` |
+| `VERITY_ALLOW_OPEN` | `false` | Deliberately run a **live** endpoint with no client keys. Without this, live mode refuses to start with no keys configured |
+| `VERITY_DASHBOARD_PASSWORD` | — (unset) | Password for the Streamlit dashboard. **Set it before deploying the dashboard anywhere** — traces contain raw prompts; without it the dashboard runs with a visible warning |
 
 ## API security & semantics
 
-- **Authentication:** the chat endpoint needs no key in mock mode; in live
-  mode Verity uses the operator's upstream key server-side (never exposed
-  to clients). `/v1/traces` is admin-only as described above — there is no
-  per-user trace access in this version.
+- **Authentication:** when client keys are configured
+  (`VERITY_CLIENT_KEYS`), the chat endpoint requires
+  `Authorization: Bearer <client key>` and answers `401 invalid_api_key`
+  otherwise; auth runs before the guard, so unauthenticated requests are
+  never screened or forwarded. With no keys configured the endpoint is
+  open — intended for the mock demo and local development. A **live**
+  (non-mock) deployment refuses to start with no keys configured unless
+  `VERITY_ALLOW_OPEN=true` is set explicitly, so an operator cannot
+  accidentally expose their upstream budget. The upstream provider key
+  stays server-side and is never exposed to clients. `/v1/traces` is
+  admin-only as described above — there is no per-user trace access in
+  this version. Note: setting client keys on a deployment also locks
+  its website playground, which calls the endpoint without a key — keep
+  the public demo keyless, and give real deployments their own keys.
 - **Block vs flag:** with `VERITY_BLOCK_ON_INJECTION=true` (default),
   flagged requests are rejected with a structured `400`; with it off, they
   pass through carrying `verity.guard_flags` for downstream handling.

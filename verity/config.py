@@ -39,3 +39,23 @@ ENABLE_DOCS = os.getenv("VERITY_ENABLE_DOCS", "false").lower() == "true"
 # Trace retention: rows older than this many days are pruned on write,
 # so the SQLite log cannot grow without bound. 0 disables pruning.
 TRACE_RETENTION_DAYS = _int_env("VERITY_TRACE_RETENTION_DAYS", 30)
+# Client API keys for /v1/chat/completions (audit F2). Clients present
+# their key as "Authorization: Bearer <key>" — the OpenAI client does
+# this automatically when its api_key is set to the Verity key. Give
+# each client its own key: VERITY_CLIENT_KEYS is a comma-separated list;
+# VERITY_CLIENT_KEY sets a single one. Empty (the default) leaves the
+# endpoint open, which is right for the public mock demo and local dev —
+# but a LIVE deployment refuses to start without keys (see the gateway
+# startup guard) unless VERITY_ALLOW_OPEN=true is set deliberately.
+
+
+def _keys_env() -> list[str]:
+    keys = [p.strip() for p in os.getenv("VERITY_CLIENT_KEYS", "").split(",")]
+    single = os.getenv("VERITY_CLIENT_KEY", "").strip()
+    if single:
+        keys.append(single)
+    return [k for k in keys if k]
+
+
+CLIENT_KEYS = _keys_env()
+ALLOW_OPEN = os.getenv("VERITY_ALLOW_OPEN", "false").lower() == "true"
