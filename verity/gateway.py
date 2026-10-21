@@ -14,6 +14,8 @@ from pydantic import BaseModel, Field
 from . import config
 from .guard import screen
 from .judge import judge_faithfulness
+from .policy import check_request as policy_check_request
+from .policy import check_response as policy_check_response
 from .scoring import faithfulness_score
 from .store import init_db, log_trace, recent_traces
 
@@ -37,6 +39,8 @@ class ChatRequest(BaseModel):
     messages: list[Message] = Field(min_length=1)
     # Optional: reference text the answer must stay grounded in.
     grounding_context: str = ""
+    # Optional: business policy the interaction must obey (milestone 4).
+    policy_context: str = ""
 
 
 def _mock_completion(model: str, messages: list[Message]) -> dict:
@@ -88,6 +92,17 @@ async def chat_completions(req: ChatRequest):
         raise HTTPException(status_code=400, detail={
             "error": "blocked_by_verity_guard", "matched_rules": flags})
 
+    # 1b. Policy guard (request side): stop requests seeking an action the
+    # business policy prohibits outright, before the model can comply.
+    if req.policy_context:
+        pol = policy_check_request(req.policy_context, combined)
+        if pol["blocked"]:
+            pflags = list(flags) + ["policy_violation"]
+            log_trace(req.model, combined, "", 0.0, blocked=True, flags=pflags)
+            raise HTTPException(status_code=400, detail={
+                "error": "blocked_by_verity_policy",
+                "action": pol["action"], "reason": pol["reason"]})
+
     # 2. Get the completion (mock or real upstream).
     if config.MOCK_MODE:
         result = _mock_completion(req.model, req.messages)
@@ -97,6 +112,21 @@ async def chat_completions(req: ChatRequest):
              "messages": [m.model_dump() for m in req.messages]})
 
     answer = result["choices"][0]["message"]["content"]
+
+    # 2b. Policy guard (response side): even if the model complied with a
+    # prohibited action, its answer never reaches the user.
+    policy_result = None
+    if req.policy_context:
+        policy_result = policy_check_response(req.policy_context, answer)
+        if policy_result["violates"]:
+            pflags = list(flags) + ["policy_violation"]
+            latency_ms = (time.perf_counter() - started) * 1000
+            log_trace(req.model, combined, answer, latency_ms, blocked=True,
+                      flags=pflags)
+            raise HTTPException(status_code=400, detail={
+                "error": "policy_violation_in_response",
+                "action": policy_result.get("action"),
+                "reason": policy_result.get("reason", "")})
 
     # 3. Score faithfulness when grounding context was supplied.
     # Milestone 2: LLM-as-judge is primary, heuristic kept as fallback/detail.
@@ -116,6 +146,9 @@ async def chat_completions(req: ChatRequest):
 
     result.setdefault("verity", {}).update(
         {"guard_flags": flags, "faithfulness": score})
+    if policy_result is not None:
+        result["verity"]["policy"] = {"checked": True, "result": "pass",
+                                      "method": policy_result["method"]}
     return result
 
 

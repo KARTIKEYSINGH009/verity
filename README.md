@@ -28,6 +28,13 @@ your app ──► Verity gateway ──► model provider (OpenAI-compatible)
   a structured verdict: score 0–1, `grounded` / `partially_grounded` /
   `hallucination_risk`, plus a one-line rationale (milestone 2). A
   deterministic heuristic scorer is kept as fallback.
+- **Business-policy guard** — when a request carries `policy_context`,
+  Verity enforces the business's own rules on both sides of the call
+  (milestone 4): requests seeking an outright-prohibited action (e.g. a
+  refund under a no-refunds policy) are blocked before the model can
+  comply, and if the model's answer performs a prohibited action anyway,
+  the answer is blocked before it reaches the user. Live mode adds an LLM
+  policy judge for nuanced rules such as refund windows.
 - **Observability** — every request is written to a trace log (input,
   output, flags, faithfulness score, latency) and viewable in a dashboard.
 
@@ -77,7 +84,7 @@ Point your OpenAI client at `http://localhost:8000/v1` instead of
 `https://api.openai.com/v1` — that's the whole integration.
 
 Dashboard: `streamlit run dashboard/app.py`
-Tests: `pytest` (23 passing)
+Tests: `pytest` (31 passing)
 
 ## Configuration
 
@@ -119,6 +126,7 @@ tests/                     Test suite
 - [x] LLM-as-judge scoring (milestone 2; heuristic kept as fallback)
 - [x] Trained injection classifier (milestone 3; Naive Bayes on word n-grams, heuristics kept as layer + fallback)
 - [x] Live deployment (Vercel; website + API in one deployment)
+- [x] Business-policy guard (milestone 4; request + response enforcement, LLM policy judge in live mode)
 - [ ] Cost tracking per endpoint
 - [ ] Alerting (Slack / webhook)
 
