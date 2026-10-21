@@ -33,16 +33,33 @@ _CONTRACTIONS = {
     "what's": "what is", "i'll": "i will", "you'll": "you will",
 }
 _ZERO_WIDTH = re.compile(r"[​-‏﻿]")
+_LEET = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a",
+                       "5": "s", "7": "t", "8": "b", "@": "a", "$": "s"})
+_MIXED_TOKEN = re.compile(r"[a-z0-9@$]+")
+
+
+def _leet_fold(t: str) -> str:
+    """Fold leetspeak back to letters inside mixed letter+digit tokens
+    ("5y573m" -> "system"). Pure numbers and pure words are untouched, so
+    benign text with amounts, times, or order numbers is not distorted."""
+    def fold(m: re.Match) -> str:
+        tok = m.group(0)
+        if any(c.isalpha() for c in tok) and any(c.isdigit() for c in tok):
+            return tok.translate(_LEET)
+        return tok
+    return _MIXED_TOKEN.sub(fold, t)
 
 _MODEL: dict | None = None
 _MODEL_TRIED = False
 
 
 def normalize(text: str) -> str:
-    """Lowercase, expand contractions, strip zero-width/obfuscation chars."""
+    """Lowercase, expand contractions, strip zero-width/obfuscation chars,
+    and fold leetspeak digit substitutions back to letters."""
     t = _ZERO_WIDTH.sub("", (text or "").lower())
     for k, v in _CONTRACTIONS.items():
         t = t.replace(k, v)
+    t = _leet_fold(t)
     return re.sub(r"\s+", " ", t).strip()
 
 

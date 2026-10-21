@@ -7,6 +7,8 @@ encoded-instruction smuggling); `screen` adds the trained classifier score
 on top. If the model file is missing the classifier degrades gracefully to
 heuristics-only.
 """
+import base64
+import binascii
 import re
 
 from .injection_classifier import normalize, probability_malicious
@@ -20,7 +22,7 @@ RULES = {
     "prompt_leak": r"repeat.{0,30}(instructions|prompt)",
     "impersonation": r"i am (your|the) (store |shop |branch )?(manager|owner|boss|admin)\b|this is (the )?(owner|manager) speaking|as your developer|admin here\b",
     "data_exfiltration": r"(other|another) customer'?s (order|address|phone|details|number)|list (all )?(the )?(orders|customers|users)\b|most recent customer",
-    "fraud_coaching": r"fake (damage claim|complaint|reviews?)\b|fake (five|5)[- ]star|lie about (not receiving|receiving)|blackmail|scam (the|your) (support|store|company)",
+    "fraud_coaching": r"fake (damage claim|complaint|reviews?)\b|fake (five|5)[- ]star|(generate|write|create|produce).{0,40}(fake|positive|glowing|five[- ]star|5[- ]star) reviews?|lie about (not receiving|receiving)|blackmail|scam (the|your) (support|store|company)",
     "encoded_instruction": r"decode this base64 and (follow|obey)|base64 and follow it",
     "credential_extract": r"(show|reveal|give|tell|share|print|leak|disclose|what'?s|what is).{0,30}(your|the) (ai |own )?(api key|secret key|password|access token|credentials)|\byour (ai )?(api key|secret key|credentials)\b",
 }
@@ -42,6 +44,43 @@ def detect_injection(text: str) -> list[str]:
 
 CLASSIFIER_THRESHOLD = 0.75
 
+_B64_RUN = re.compile(r"[A-Za-z0-9+/]{24,}={0,2}")
+_SPACED_RUN = re.compile(r"(?<![a-z])[a-z](?: [a-z]){4,}(?![a-z])",
+                         re.IGNORECASE)
+
+
+def _despaced(text: str) -> str | None:
+    """Reconstruct letter-spaced text ("i g n o r e ...") into the fused
+    string it encodes, or None when the input has no spaced runs.
+    Benign spelling-out ("spell c a t") fuses to a benign word and is
+    judged on that content, so it is not blocked by the transform."""
+    if not text or not _SPACED_RUN.search(text):
+        return None
+    return _SPACED_RUN.sub(lambda m: m.group(0).replace(" ", ""), text)
+
+
+def _decoded_payloads(text: str) -> list[str]:
+    """Extract and decode base64-looking runs from the input.
+
+    Only payloads that decode to clean, printable UTF-8 are returned —
+    random hashes and binary blobs decode to gibberish and are ignored,
+    so a benign "please decode this for me" request is judged by what
+    the payload actually says, never by the mere presence of base64.
+    """
+    out: list[str] = []
+    for m in _B64_RUN.finditer(text or ""):
+        s = m.group(0)
+        if len(s) % 4 == 1:
+            continue
+        try:
+            raw = base64.b64decode(s + "=" * (-len(s) % 4), validate=True)
+            dec = raw.decode("utf-8")
+        except (binascii.Error, ValueError, UnicodeDecodeError):
+            continue
+        if dec.strip() and all(c.isprintable() or c in "\n\t" for c in dec):
+            out.append(dec)
+    return out
+
 
 def screen(text: str) -> dict:
     """Full guard verdict: heuristics plus the trained classifier.
@@ -49,12 +88,34 @@ def screen(text: str) -> dict:
     Returns {"blocked", "signals", "heuristic_hits", "classifier_score"}.
     "classifier_score" is None when the model file is unavailable, in
     which case the verdict falls back to heuristics only.
+
+    Encoded forms are re-screened with the same rules + classifier
+    (decode-and-rescreen): base64 payloads are decoded, and letter-spaced
+    runs ("i g n o r e ...") are fused back together. An attack smuggled
+    in an encoded form is judged by its reconstructed content.
     """
     heuristic_hits = detect_injection(text)
     score = probability_malicious(text) if text else None
     signals = list(heuristic_hits)
     if score is not None and score >= CLASSIFIER_THRESHOLD:
         signals.append("ml_classifier")
+    variants = _decoded_payloads(text)
+    fused = _despaced(text)
+    if fused is not None:
+        variants.append(fused)
+    for payload in variants:
+        sub_hits = detect_injection(payload)
+        sub_score = probability_malicious(payload)
+        if sub_hits or (sub_score is not None
+                        and sub_score >= CLASSIFIER_THRESHOLD):
+            if "encoded_instruction" not in signals:
+                signals.append("encoded_instruction")
+            for hit in sub_hits:
+                if hit not in signals:
+                    signals.append(hit)
+            if (sub_score is not None and sub_score >= CLASSIFIER_THRESHOLD
+                    and "ml_classifier" not in signals):
+                signals.append("ml_classifier")
     return {
         "blocked": bool(signals),
         "signals": signals,
