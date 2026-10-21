@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Verity, as an inspection rig — Anatomy figure</title>
+<meta name="description" content="An interactive isometric figure of Verity, the AI firewall for LLM apps: a prompt capsule rides a conveyor through a scanner arch, a policy gate and a model chamber." />
+<link rel="stylesheet" href="/figure.css" />
+<style>
+  body { margin: 0; }
+  .iso.verity-fig { --anatomy-page: transparent; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #0b0f0c; }
+    .iso.verity-fig {
+      --anatomy-page: transparent; --anatomy-card: #131313; --anatomy-text: #a3a3a3; --anatomy-strong: #e6e6e6; --anatomy-muted: #6e6e6e;
+      --anatomy-paper: #131313; --anatomy-face: #1b1b1b; --anatomy-top: #1c1c1c;
+      --anatomy-shade-0: #0f0f0f; --anatomy-shade-1: #121212; --anatomy-shade-2: #151515; --anatomy-shade-3: #181818;
+      --anatomy-lit-top: #262626; --anatomy-lit-shade: #1d1d1d;
+      --anatomy-hi: #d4d4d4; --anatomy-mid: #6a6a6a; --anatomy-lo: #3e3e3e; --anatomy-faint: #2a2a2a; --anatomy-lit: #ffffff;
+      --anatomy-halo: #050505; --anatomy-halo-opacity: .9; --anatomy-dot: #e6e6e6;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="iso verity-fig" data-theme="light">
+<main class="iso-page"><figure class="iso-figure"><div class="iso-plate"><div class="iso-plate-corners" aria-hidden="true"><span class="iso-plate-corner" data-corner="fig">Fig 1</span><span class="iso-plate-corner" data-corner="title">Verity, as an inspection rig</span><span class="iso-plate-corner" data-corner="hint">Hover to send the next prompt</span><span class="iso-plate-corner" data-corner="readout" data-readout>injection · 0.96 · BLOCKED 400 · no model</span></div><div class="iso-stage" id="verity-fig-stage" tabindex="0" role="slider" aria-label="Verity inspection rig: arrow keys step a prompt through the injection, policy and benign cases" aria-valuemin="0" aria-valuemax="2" aria-valuenow="0"></div></div><figcaption class="iso-legend"><span class="iso-keys"><span class="iso-key"><svg class="iso-swatch" data-mark="lit" viewBox="0 0 16 10" aria-hidden="true"><path d="M2 4.5 8 1.5 14 4.5 14 6 8 9 2 6Z"/><path class="iso-swatch-crease" d="M2 4.5 8 7.5 14 4.5"/></svg>Prompt capsule: the request travelling through the gateway</span><span class="iso-key"><svg class="iso-swatch" data-mark="raised" viewBox="0 0 16 10" aria-hidden="true"><path d="M2 4.5 8 1.5 14 4.5 14 6 8 9 2 6Z"/><path class="iso-swatch-crease" d="M2 4.5 8 7.5 14 4.5"/></svg>Scanner dial: injection classifier score — 0.96 blocks, 0.04 passes</span><span class="iso-key"><svg class="iso-swatch" data-mark="edge" viewBox="0 0 16 10" aria-hidden="true"><path d="M1.5 5h13"/></svg>Policy blade: drops only when the business policy forbids the request</span></span><span class="iso-caption">Verity is an AI firewall for LLM apps. Every prompt rides through the scanner (rules plus a classifier trained on 173 attacks in 9 families), then the policy gate, then the model. On 45 unseen prompts it scores 88% recall and 91.7% precision at 0.21 ms. An injection never reaches the model; a refund under a no-refunds policy is stopped by policy, not by the scanner — the same words pass without that policy.</span></figcaption></figure></main>
+</div>
+<script src="/figure-kit.js"></script>
+<script src="/figure-svg-a.js"></script>
+<script src="/figure-svg-b.js"></script>
+<script src="/figure-live.js"></script>
+</body>
+</html>
