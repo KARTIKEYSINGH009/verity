@@ -251,7 +251,7 @@ tests/                     Test suite
 - [x] Trained injection classifier (milestone 3; Naive Bayes on word n-grams, heuristics kept as layer + fallback)
 - [x] Live deployment (Vercel; website + API in one deployment)
 - [x] Business-policy guard (milestone 4; request + response enforcement, LLM policy judge in live mode)
-- [x] All-abuse hardening (growing dataset — 186 examples — across nine abuse families, 11 guard rules, red-team suite, published held-out benchmark)
+- [x] All-abuse hardening (growing dataset — 200 examples — across nine abuse families, 11 guard rules, red-team suite, published held-out benchmark)
 - [x] Deep Hat adversarial round (2026-10-21): an independent uncensored red-team model generated 24 fresh attacks; 19/24 blocked on first contact, the 5 misses (base64 smuggling, leetspeak, German injection, sympathy-pretext data theft, privilege-grant policy gap) closed with decode-and-rescreen normalization (base64 + leet + letter-spacing), a policy privilege action, and corrections — 24/24 on re-run, held-out benchmark unchanged (recall 0.88, precision 0.917)
 - [x] Learning guard (milestone 5; normalization + character n-grams, human-reviewed benchmark-gated corrections loop)
 - [ ] Cost tracking per endpoint
