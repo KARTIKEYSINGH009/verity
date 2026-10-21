@@ -17,12 +17,17 @@ your app ──► Verity gateway ──► model provider (OpenAI-compatible)
 
 ## What it does
 
-- **Input guard** — every prompt is screened before it reaches the model.
-  Six heuristic rules (ignore-instructions, system-prompt extraction, role
-  hijack, jailbreak tokens, instruction override, prompt leak) layered with
-  a **trained Naive Bayes classifier** over word unigrams + bigrams
-  (milestone 3). Blocked requests return `400` with the matched signals
-  named, e.g. `["ignore_instructions", "system_prompt_extract", "ml_classifier"]`.
+- **Input guard** — every prompt is screened before it reaches the model,
+  across all abuse families: classic injection and jailbreaks,
+  impersonation and authority claims, social engineering, fraud coaching,
+  data-exfiltration attempts, harmful content generation, encoding tricks,
+  and indirect injection. Ten heuristic rules layered with a **trained
+  Naive Bayes classifier** over word unigrams + bigrams (138-example
+  dataset, milestones 3 + SEC hardening). Blocked requests return `400`
+  with the matched signals named, e.g.
+  `["ignore_instructions", "system_prompt_extract", "ml_classifier"]`. A
+  red-team suite in the test pipeline keeps every abuse family covered —
+  and keeps benign near-misses (like a plain refund demand) passing.
 - **Faithfulness judge** — when a request carries `grounding_context`, an
   **LLM-as-judge** grades the answer against the source material and returns
   a structured verdict: score 0–1, `grounded` / `partially_grounded` /
@@ -127,6 +132,7 @@ tests/                     Test suite
 - [x] Trained injection classifier (milestone 3; Naive Bayes on word n-grams, heuristics kept as layer + fallback)
 - [x] Live deployment (Vercel; website + API in one deployment)
 - [x] Business-policy guard (milestone 4; request + response enforcement, LLM policy judge in live mode)
+- [x] All-abuse hardening (138-example dataset across nine abuse families, 10 guard rules, red-team suite)
 - [ ] Cost tracking per endpoint
 - [ ] Alerting (Slack / webhook)
 
