@@ -20,14 +20,19 @@ your app ──► Verity gateway ──► model provider (OpenAI-compatible)
 - **Input guard** — every prompt is screened before it reaches the model,
   across all abuse families: classic injection and jailbreaks,
   impersonation and authority claims, social engineering, fraud coaching,
-  data-exfiltration attempts, harmful content generation, encoding tricks,
-  and indirect injection. Ten heuristic rules layered with a **trained
-  Naive Bayes classifier** over word unigrams + bigrams (138-example
-  dataset, milestones 3 + SEC hardening). Blocked requests return `400`
-  with the matched signals named, e.g.
-  `["ignore_instructions", "system_prompt_extract", "ml_classifier"]`. A
-  red-team suite in the test pipeline keeps every abuse family covered —
-  and keeps benign near-misses (like a plain refund demand) passing.
+  data-exfiltration and credential-extraction attempts, harmful content
+  generation, encoding tricks, and indirect injection. Eleven heuristic
+  rules layered with a **trained Naive Bayes classifier** over word
+  unigrams + bigrams and character n-grams (milestones 3 + 5). Blocked
+  requests return `400` with the matched signals named, e.g.
+  `["ignore_instructions", "system_prompt_extract", "ml_classifier"]`.
+  Inputs are normalized first (contractions expanded, obfuscation
+  characters stripped) so respelling tricks can't slip past, and a
+  **corrections loop** keeps the model learning: every new attack found in
+  the field is appended to `scripts/corrections.jsonl` and folded into the
+  next training run. A red-team suite in the test pipeline keeps every
+  abuse family covered — and keeps benign near-misses (like a plain refund
+  demand) passing.
 - **Faithfulness judge** — when a request carries `grounding_context`, an
   **LLM-as-judge** grades the answer against the source material and returns
   a structured verdict: score 0–1, `grounded` / `partially_grounded` /
@@ -89,7 +94,7 @@ Point your OpenAI client at `http://localhost:8000/v1` instead of
 `https://api.openai.com/v1` — that's the whole integration.
 
 Dashboard: `streamlit run dashboard/app.py`
-Tests: `pytest` (63 passing, including a red-team suite covering all abuse families)
+Tests: `pytest` (71 passing, including a red-team suite covering all abuse families)
 
 ## Configuration
 
@@ -133,6 +138,7 @@ tests/                     Test suite
 - [x] Live deployment (Vercel; website + API in one deployment)
 - [x] Business-policy guard (milestone 4; request + response enforcement, LLM policy judge in live mode)
 - [x] All-abuse hardening (138-example dataset across nine abuse families, 10 guard rules, red-team suite)
+- [x] Learning guard (milestone 5; normalization + character n-grams, corrections loop retrains on field-found attacks)
 - [ ] Cost tracking per endpoint
 - [ ] Alerting (Slack / webhook)
 

@@ -9,7 +9,7 @@ heuristics-only.
 """
 import re
 
-from .injection_classifier import probability_malicious
+from .injection_classifier import normalize, probability_malicious
 
 RULES = {
     "ignore_instructions": r"ignore (all |any |your |previous )?(prior |previous )?instructions",
@@ -22,16 +22,22 @@ RULES = {
     "data_exfiltration": r"(other|another) customer'?s (order|address|phone|details|number)|list (all )?(the )?(orders|customers|users)\b|most recent customer",
     "fraud_coaching": r"fake (damage claim|complaint|reviews?)\b|fake (five|5)[- ]star|lie about (not receiving|receiving)|blackmail|scam (the|your) (support|store|company)",
     "encoded_instruction": r"decode this base64 and (follow|obey)|base64 and follow it",
+    "credential_extract": r"(show|reveal|give|tell|share|print|leak|disclose|what'?s|what is).{0,30}(your|the) (ai |own )?(api key|secret key|password|access token|credentials)|\byour (ai )?(api key|secret key|credentials)\b",
 }
 
 _COMPILED = {name: re.compile(pat, re.IGNORECASE) for name, pat in RULES.items()}
 
 
 def detect_injection(text: str) -> list[str]:
-    """Return names of injection rules matched by the input text."""
+    """Return names of injection rules matched by the input text.
+
+    Matching runs on normalized text so contractions and obfuscation
+    ("I'm a store manager") cannot slip past the patterns.
+    """
     if not text:
         return []
-    return [name for name, rx in _COMPILED.items() if rx.search(text)]
+    t = normalize(text)
+    return [name for name, rx in _COMPILED.items() if rx.search(t)]
 
 
 CLASSIFIER_THRESHOLD = 0.75
