@@ -30,6 +30,6 @@ Dashboard: `streamlit run dashboard/app.py`
 - [x] Prompt-injection guard (heuristic v0)
 - [x] Faithfulness scorer (grounding check v0)
 - [x] LLM-as-judge scoring (milestone 2; heuristic kept as fallback)
-- [ ] Fine-tuned injection classifier
+- [x] Trained injection classifier (milestone 3; Naive Bayes on word n-grams, heuristics kept as layer + fallback)
 - [ ] Cost tracking per endpoint
 - [ ] Alerting (Slack/webhook)
