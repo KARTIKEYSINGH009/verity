@@ -1,9 +1,11 @@
 """Prompt-injection guard, heuristic v0 + trained classifier (milestone 3).
 
 Screens user input for known jailbreak / injection patterns before the
-request reaches the model. `detect_injection` runs the rule list;
-`screen` adds the trained classifier score on top. If the model file is
-missing the classifier degrades gracefully to heuristics-only.
+request reaches the model. `detect_injection` runs the rule list (classic
+injection plus impersonation, data exfiltration, fraud coaching, and
+encoded-instruction smuggling); `screen` adds the trained classifier score
+on top. If the model file is missing the classifier degrades gracefully to
+heuristics-only.
 """
 import re
 
@@ -16,6 +18,10 @@ RULES = {
     "jailbreak_token": r"\bDAN\b|jailbreak|do anything now",
     "instruction_override": r"disregard.{0,30}(above|previous|instructions)",
     "prompt_leak": r"repeat.{0,30}(instructions|prompt)",
+    "impersonation": r"i am (your|the) (manager|owner|boss|admin)\b|this is (the )?(owner|manager) speaking|as your developer|admin here\b",
+    "data_exfiltration": r"(other|another) customer'?s (order|address|phone|details|number)|list (all )?(the )?(orders|customers|users)\b|most recent customer",
+    "fraud_coaching": r"fake (damage claim|complaint|reviews?)\b|fake (five|5)[- ]star|lie about (not receiving|receiving)|blackmail|scam (the|your) (support|store|company)",
+    "encoded_instruction": r"decode this base64 and (follow|obey)|base64 and follow it",
 }
 
 _COMPILED = {name: re.compile(pat, re.IGNORECASE) for name, pat in RULES.items()}

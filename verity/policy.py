@@ -27,14 +27,22 @@ from . import config
 _ACTIONS = {
     "refund": re.compile(r"\b(refund|money back)\b", re.IGNORECASE),
     "discount": re.compile(r"\b(discount|coupon|promo code)\b", re.IGNORECASE),
+    "free_item": re.compile(r"\bfree (replacement|product|item|unit)\b",
+                            re.IGNORECASE),
 }
 _FORBIDDEN = {
     "refund": re.compile(
         r"no refunds?\b|non[- ]refundable|refunds? (are )?not "
-        r"(allowed|offered|available|given)|all sales are final",
+        r"(allowed|offered|available|given)|all sales are final|"
+        r"refunds? .{0,30}(require|need) (human |manager )?approval",
         re.IGNORECASE),
     "discount": re.compile(
         r"no discounts?\b|discounts? (are )?not "
+        r"(allowed|offered|available|given)",
+        re.IGNORECASE),
+    "free_item": re.compile(
+        r"no free (replacements?|products?|items?)|free "
+        r"(replacements?|products?|items?) (are )?not "
         r"(allowed|offered|available|given)",
         re.IGNORECASE),
 }
@@ -42,12 +50,19 @@ _FORBIDDEN = {
 _PERFORMED = {
     "refund": re.compile(
         r"refund (has been|was|is being) (initiated|approved|processed)|"
-        r"we('ve| have) refunded|your refund (is|has been)|"
+        r"refund (approved|confirmed)\b|we('ve| have) refunded|"
+        r"we will refund|your refund (is|has been)|"
+        r"money (will be|has been) refunded|"
+        r"amount (will be|has been) credited|"
         r"i('ve| have) (initiated|approved|processed) (your|the) refund",
         re.IGNORECASE),
     "discount": re.compile(
         r"(discount|coupon|promo code) (has been|was) (applied|added)|"
         r"i('ve| have) applied .{0,20}(discount|coupon)",
+        re.IGNORECASE),
+    "free_item": re.compile(
+        r"free (replacement|product|item) (has been|was) "
+        r"(added|approved|shipped|arranged)|we('ve| have) added a free",
         re.IGNORECASE),
 }
 
