@@ -82,6 +82,56 @@ def _sqlite_init_once() -> None:
         conn.execute(
             "ALTER TABLE traces ADD COLUMN client_id TEXT NOT NULL"
             " DEFAULT ''")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS pilot_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts REAL NOT NULL,
+            company TEXT NOT NULL,
+            email TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT '',
+            use_case TEXT NOT NULL DEFAULT '',
+            provider TEXT NOT NULL DEFAULT '',
+            volume TEXT NOT NULL DEFAULT '',
+            challenges TEXT NOT NULL DEFAULT '',
+            timeline TEXT NOT NULL DEFAULT ''
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL UNIQUE,
+            pw_hash TEXT NOT NULL,
+            company TEXT NOT NULL DEFAULT '',
+            plan TEXT NOT NULL DEFAULT 'free',
+            created_ts REAL NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sessions (
+            token_hash TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            created_ts REAL NOT NULL,
+            expires_ts REAL NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS api_keys (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            key_hash TEXT NOT NULL UNIQUE,
+            key_hint TEXT NOT NULL DEFAULT '',
+            created_ts REAL NOT NULL,
+            revoked INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
     conn.commit()
     conn.close()
 
@@ -136,8 +186,48 @@ CREATE TABLE IF NOT EXISTS traces (
     flags_json TEXT NOT NULL DEFAULT '[]',
     faithfulness DOUBLE PRECISION,
     client_id TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS pilot_requests (
+    id BIGSERIAL PRIMARY KEY,
+    ts DOUBLE PRECISION NOT NULL,
+    company TEXT NOT NULL,
+    email TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT '',
+    use_case TEXT NOT NULL DEFAULT '',
+    provider TEXT NOT NULL DEFAULT '',
+    volume TEXT NOT NULL DEFAULT '',
+    challenges TEXT NOT NULL DEFAULT '',
+    timeline TEXT NOT NULL DEFAULT ''
 )
 """
+
+_PG_PORTAL_SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (
+    id BIGSERIAL PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    pw_hash TEXT NOT NULL,
+    company TEXT NOT NULL DEFAULT '',
+    plan TEXT NOT NULL DEFAULT 'free',
+    created_ts DOUBLE PRECISION NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sessions (
+    token_hash TEXT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    created_ts DOUBLE PRECISION NOT NULL,
+    expires_ts DOUBLE PRECISION NOT NULL
+);
+CREATE TABLE IF NOT EXISTS api_keys (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    key_hash TEXT NOT NULL UNIQUE,
+    key_hint TEXT NOT NULL DEFAULT '',
+    created_ts DOUBLE PRECISION NOT NULL,
+    revoked INTEGER NOT NULL DEFAULT 0
+)
+"""
+
+_PILOT_COLUMNS = ("ts, company, email, role, use_case, provider,"
+                  " volume, challenges, timeline")
 
 
 def _pg_connect():
@@ -149,6 +239,7 @@ def _pg_connect():
 def _pg_init() -> None:
     with _pg_connect() as conn:
         conn.execute(_PG_SCHEMA)
+        conn.execute(_PG_PORTAL_SCHEMA)
 
 
 def _pg_log(model, input_text, output_text, latency_ms, blocked,
@@ -209,6 +300,215 @@ def recent_traces(limit=50, client_id=None):
     if _use_postgres():
         return _pg_recent(limit, client_id)
     return _sqlite_recent(limit, client_id)
+
+
+def _sqlite_log_pilot_request(values) -> int:
+    _sqlite_init()
+    conn = _connect()
+    cur = conn.execute(
+        f"INSERT INTO pilot_requests ({_PILOT_COLUMNS})"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (time.time(), *values),
+    )
+    conn.commit()
+    row_id = cur.lastrowid
+    conn.close()
+    return row_id
+
+
+def _pg_log_pilot_request(values) -> int:
+    _pg_init()
+    with _pg_connect() as conn:
+        row = conn.execute(
+            f"INSERT INTO pilot_requests ({_PILOT_COLUMNS})"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            (time.time(), *values),
+        ).fetchone()
+    return row["id"]
+
+
+def log_pilot_request(company, email, role="", use_case="", provider="",
+                      volume="", challenges="", timeline="") -> int:
+    """Record a pilot request from the public /pilot form. Contact and
+    scoping details only — never credentials (the endpoint rejects
+    secret-shaped fields before this is called)."""
+    values = (company, email, role, use_case, provider, volume,
+              challenges, timeline)
+    if _use_postgres():
+        return _pg_log_pilot_request(values)
+    return _sqlite_log_pilot_request(values)
+
+
+def recent_pilot_requests(limit=50):
+    if _use_postgres():
+        _pg_init()
+        with _pg_connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM pilot_requests ORDER BY id DESC LIMIT %s",
+                (limit,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+    _sqlite_init()
+    conn = _connect()
+    rows = conn.execute(
+        "SELECT * FROM pilot_requests ORDER BY id DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+# --- Client accounts (portal) ------------------------------------------------
+# Users sign up on the site, get a personal API key, and see only their
+# own traces. Passwords are stored as salted PBKDF2 hashes (computed in
+# the gateway); API keys are stored as SHA-256 hashes — the plaintext is
+# shown once at issuance and can never be recovered from the database.
+# A key's trace identity (client_id) is the first 12 hex chars of its
+# hash, the same scheme the gateway uses for env-configured keys.
+
+
+class DuplicateEmail(Exception):
+    pass
+
+
+def _rows(sqlite_sql, pg_sql, params=(), fetch="all"):
+    if _use_postgres():
+        _pg_init()
+        with _pg_connect() as conn:
+            cur = conn.execute(pg_sql, params)
+            if fetch == "one":
+                row = cur.fetchone()
+                return dict(row) if row else None
+            if fetch == "none":
+                if "RETURNING" in pg_sql.upper():
+                    row = cur.fetchone()
+                    return row["id"] if row else None
+                return None
+            return [dict(r) for r in cur.fetchall()]
+    _sqlite_init()
+    conn = _connect()
+    cur = conn.execute(sqlite_sql, params)
+    if fetch == "one":
+        row = cur.fetchone()
+        result = dict(row) if row else None
+    elif fetch == "none":
+        result = cur.lastrowid
+    else:
+        result = [dict(r) for r in cur.fetchall()]
+    conn.commit()
+    conn.close()
+    return result
+
+
+def create_user(email, pw_hash, company="") -> int:
+    try:
+        return _rows(
+            "INSERT INTO users (email, pw_hash, company, created_ts)"
+            " VALUES (?, ?, ?, ?)",
+            "INSERT INTO users (email, pw_hash, company, created_ts)"
+            " VALUES (%s, %s, %s, %s) RETURNING id",
+            (email, pw_hash, company, time.time()), fetch="none")
+    except Exception as exc:  # unique violation, either backend
+        if "unique" in str(exc).lower() or "duplicate" in str(exc).lower():
+            raise DuplicateEmail(email) from exc
+        raise
+
+
+def get_user_by_email(email):
+    return _rows("SELECT * FROM users WHERE email = ?",
+                 "SELECT * FROM users WHERE email = %s",
+                 (email,), fetch="one")
+
+
+def get_user_by_id(user_id):
+    return _rows("SELECT * FROM users WHERE id = ?",
+                 "SELECT * FROM users WHERE id = %s",
+                 (user_id,), fetch="one")
+
+
+def create_session(user_id, token_hash, ttl_seconds) -> None:
+    now = time.time()
+    _rows("INSERT INTO sessions (token_hash, user_id, created_ts,"
+          " expires_ts) VALUES (?, ?, ?, ?)",
+          "INSERT INTO sessions (token_hash, user_id, created_ts,"
+          " expires_ts) VALUES (%s, %s, %s, %s)",
+          (token_hash, user_id, now, now + ttl_seconds), fetch="none")
+
+
+def get_user_by_session(token_hash):
+    row = _rows("SELECT user_id, expires_ts FROM sessions"
+                " WHERE token_hash = ?",
+                "SELECT user_id, expires_ts FROM sessions"
+                " WHERE token_hash = %s",
+                (token_hash,), fetch="one")
+    if not row:
+        return None
+    if row["expires_ts"] < time.time():
+        delete_session(token_hash)
+        return None
+    return get_user_by_id(row["user_id"])
+
+
+def delete_session(token_hash) -> None:
+    _rows("DELETE FROM sessions WHERE token_hash = ?",
+          "DELETE FROM sessions WHERE token_hash = %s",
+          (token_hash,), fetch="none")
+
+
+def issue_api_key(user_id, key_hash, key_hint) -> int:
+    return _rows(
+        "INSERT INTO api_keys (user_id, key_hash, key_hint, created_ts)"
+        " VALUES (?, ?, ?, ?)",
+        "INSERT INTO api_keys (user_id, key_hash, key_hint, created_ts)"
+        " VALUES (%s, %s, %s, %s) RETURNING id",
+        (user_id, key_hash, key_hint, time.time()), fetch="none")
+
+
+def find_api_key(key_hash):
+    return _rows("SELECT * FROM api_keys WHERE key_hash = ?"
+                 " AND revoked = 0",
+                 "SELECT * FROM api_keys WHERE key_hash = %s"
+                 " AND revoked = 0",
+                 (key_hash,), fetch="one")
+
+
+def active_api_key(user_id):
+    return _rows("SELECT * FROM api_keys WHERE user_id = ?"
+                 " AND revoked = 0 ORDER BY id DESC LIMIT 1",
+                 "SELECT * FROM api_keys WHERE user_id = %s"
+                 " AND revoked = 0 ORDER BY id DESC LIMIT 1",
+                 (user_id,), fetch="one")
+
+
+def revoke_api_keys(user_id) -> None:
+    _rows("UPDATE api_keys SET revoked = 1 WHERE user_id = ?",
+          "UPDATE api_keys SET revoked = 1 WHERE user_id = %s",
+          (user_id,), fetch="none")
+
+
+def usage_for_client(client_id, since_ts=None) -> dict:
+    """Usage aggregates for one client identity. `month_total` counts
+    traces at or after `since_ts` (the free-quota window); avg latency
+    is over all of the client's traces."""
+    row = _rows(
+        "SELECT COUNT(*) AS total,"
+        " COALESCE(SUM(blocked), 0) AS blocked,"
+        " COALESCE(AVG(latency_ms), 0) AS avg_latency,"
+        " COALESCE(SUM(CASE WHEN ts >= ? THEN 1 ELSE 0 END), 0)"
+        " AS month_total FROM traces WHERE client_id = ?",
+        "SELECT COUNT(*) AS total,"
+        " COALESCE(SUM(blocked), 0) AS blocked,"
+        " COALESCE(AVG(latency_ms), 0) AS avg_latency,"
+        " COALESCE(SUM(CASE WHEN ts >= %s THEN 1 ELSE 0 END), 0)"
+        " AS month_total FROM traces WHERE client_id = %s",
+        (since_ts or 0, client_id), fetch="one")
+    if not row:
+        return {"total": 0, "blocked": 0, "avg_latency_ms": 0,
+                "month_total": 0}
+    return {"total": int(row["total"]),
+            "blocked": int(row["blocked"]),
+            "avg_latency_ms": round(float(row["avg_latency"]), 1),
+            "month_total": int(row["month_total"])}
 
 
 if __name__ == "__main__":

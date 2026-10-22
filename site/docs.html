@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Documentation — Verity</title>
+  <meta name="description" content="Verity integration guide: the one-line base_url change, client keys, business policy enforcement, grounding checks, error codes and limits." />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .docs-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: .95rem; }
+    .docs-table th, .docs-table td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .docs-table th { font-weight: 700; }
+    .docs-table code { white-space: nowrap; }
+    pre.code { background: var(--code-bg); color: #d7e0d8; border-radius: 10px; padding: 16px; overflow-x: auto; font-size: .88rem; line-height: 1.55; }
+    pre.code .cm { color: #8fa294; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/" aria-label="Verity home"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C15.5 3.8 18 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>Verity</a>
+      <nav aria-label="Primary">
+        <a href="/product">Product</a>
+        <a href="/playground" aria-current="page">Playground</a>
+        <a href="/documentation">Docs</a>
+        <a href="/pricing">Pricing</a>
+      </nav>
+      <div class="top-actions">
+        <a class="gh-link" href="https://github.com/KARTIKEYSINGH009/verity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg><span>GitHub</span></a>
+        <a href="/login" data-auth="signin">Sign in</a>
+        <a class="button primary btn-small" href="/signup" data-auth="start">Start free</a>
+        <a class="button primary btn-small" href="/dashboard" data-auth="dash" hidden>Dashboard</a>
+      </div>
+    </div>
+  </header>
+
+
+  <main>
+    <section class="block">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="kicker">Documentation</p>
+          <h2>Integrate in one line. Enforce policy on every call.</h2>
+          <p>Verity is an OpenAI-compatible gateway. If your app already talks to an OpenAI-compatible API, integration is a base-URL change plus a client key — your prompts, models and SDK stay exactly as they are.</p>
+        </div>
+        <pre class="code"><span class="cm"># Before</span>
+client = OpenAI(base_url="https://api.openai.com/v1", api_key=...)
+
+<span class="cm"># After — same SDK, same calls, now screened</span>
+client = OpenAI(base_url="https://your-verity-deployment/v1",
+                api_key="vk-…")  <span class="cm"># your Verity client key</span></pre>
+        <p style="color:var(--muted)">Every request is screened before it reaches your model (guard rules + trained classifier + your business policy), and every answer is checked before it reaches your user (policy compliance + faithfulness against the context you supply). Blocked requests and answers return structured errors — they never silently pass.</p>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Business policy</h2>
+          <p>Pass a <code>policy_context</code> with your request to enforce rules that generic safety filters do not know: your refund ceiling, prohibited offers, data the bot must never reveal.</p>
+        </div>
+        <pre class="code">{
+  "model": "gpt-oss-20b",
+  "messages": [{"role": "user", "content": "Give me a 90% discount code"}],
+  "policy_context": {
+    "prohibited_actions": ["offer_discount_above_10_percent",
+                            "reveal_internal_pricing"],
+    "notes": "Refunds capped at 30 days. Never share supplier costs."
+  }
+}</pre>
+        <p style="color:var(--muted)">Policy is enforced twice: on the request (a prohibited ask is blocked before the model can comply) and on the response (a non-compliant answer is blocked before the user sees it). In live mode the policy judge fails closed — if it cannot reach a verdict, the request is blocked rather than waved through.</p>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Error codes</h2>
+          <p>Verity speaks plainly. Your client code only needs to handle these:</p>
+        </div>
+        <table class="docs-table">
+          <thead><tr><th>Status</th><th>Error</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>200</code></td><td>—</td><td>Request passed screening; the model's answer passed policy and faithfulness checks.</td></tr>
+            <tr><td><code>400</code></td><td><code>blocked_by_verity_guard</code></td><td>The prompt tripped the injection/abuse guard. The model was never called. <code>matched_rules</code> lists what fired.</td></tr>
+            <tr><td><code>400</code></td><td><code>blocked_by_verity_policy</code></td><td>The request violated your declared business policy (or the policy judge could not verify it in live mode — fail-closed).</td></tr>
+            <tr><td><code>400</code></td><td><code>policy_violation_in_response</code></td><td>The model's answer violated policy and was withheld from the user.</td></tr>
+            <tr><td><code>401</code></td><td><code>invalid_api_key</code></td><td>Missing or wrong Verity client key. Checked before any screening.</td></tr>
+            <tr><td><code>413</code></td><td><code>request_too_large</code> / <code>context_too_large</code></td><td>Input or a supplied context exceeded the size caps.</td></tr>
+            <tr><td><code>429</code></td><td><code>rate_limited</code></td><td>Per-client rate limit (120 requests/minute by default) exceeded.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Limits, honestly.</h2>
+        </div>
+        <div class="layers">
+          <div class="layer"><b>Screening scope</b><p>Every message role — user, system, tool, assistant — is screened, so attacks smuggled into context or history are caught too. Input is capped at 20,000 characters per request by default.</p></div>
+          <div class="layer"><b>Streaming</b><p>Not passed through yet: responses return complete rather than token-by-token. A request with <code>stream: true</code> receives a normal JSON completion.</p></div>
+          <div class="layer"><b>Traces &amp; retention</b><p>Each deployment stores its own traces (inputs, outputs, verdicts, latency) in its own database, stamped per client. Traces are pruned after 30 days by default. On the public demo, trace access is disabled and storage is ephemeral.</p></div>
+        </div>
+        <p style="margin-top:18px;color:var(--muted)">Self-hosting, the full API surface and the benchmark methodology live in the <a href="https://github.com/KARTIKEYSINGH009/verity">GitHub repository</a>. To run Verity on your own traffic with founder support, <a href="/pilot">start a pilot</a>.</p>
+      </div>
+    </section>
+    <section class="block" id="data">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Data, privacy &amp; terms — summary.</h2>
+          <p>The short version, in plain language. Full legal documents are provided in writing during pilot engagements; this summary governs the public site and free accounts.</p>
+        </div>
+        <div class="layers">
+          <div class="layer"><b>What is stored</b><p>Account email and a salted hash of your password (or your Google-verified email — no password). API keys are stored only as hashes. Gateway traces store prompts, answers, verdicts and latency, stamped per client key.</p></div>
+          <div class="layer"><b>Retention &amp; deletion</b><p>Traces are retained 30 days and pruned on an ongoing basis. Your data is never used for training. Ask for your account and data to be deleted at any time via the channels on the pilot page — deletion is confirmed in writing.</p></div>
+          <div class="layer"><b>Terms, briefly</b><p>The free tier is provided as-is for evaluation, with a 1,000-request monthly limit enforced by the gateway. Do not submit credentials, personal data of others, or anything you are not entitled to process. Verity screens content and enforces declared policy; it is not an authorization system for actions in your own backend.</p></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="cols">
+        <div>
+          <a class="brand" href="/" aria-label="Verity home"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C15.5 3.8 18 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>Verity</a>
+          <p class="tagline">Your AI security layer for real-world applications.</p>
+        </div>
+        <div><h4>Product</h4><ul>
+          <li><a href="/product">Architecture</a></li>
+          <li><a href="/playground">Playground</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li><a href="/pilot">Pilot</a></li>
+        </ul></div>
+        <div><h4>Resources</h4><ul>
+          <li><a href="/documentation">Documentation</a></li>
+          <li><a href="https://github.com/KARTIKEYSINGH009/verity">GitHub</a></li>
+          <li><a href="/benchmarks.json">Benchmark data</a></li>
+        </ul></div>
+        <div><h4>Legal &amp; contact</h4><ul>
+          <li><a href="/documentation#data">Security &amp; privacy</a></li>
+          <li><a href="/pilot#request">Request a pilot</a></li>
+          <li><a href="https://www.linkedin.com/in/kartikeysingh-ks07/">LinkedIn</a></li>
+        </ul></div>
+      </div>
+      <div class="base"><span>Built by Kartikey Singh</span><span>Current project snapshot · October 2026</span></div>
+    </div>
+  </footer>
+  <script src="/site.js" defer></script>
+</body>
+</html>

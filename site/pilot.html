@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pilot — Verity</title>
+  <meta name="description" content="A two-to-four-week, founder-led Verity pilot on your own AI workflow: dedicated deployment, agreed success criteria, weekly reports, a clear verdict." />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .pilot-form { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px; }
+    .pilot-form .full { grid-column: 1 / -1; }
+    .pilot-form label { display: block; font-weight: 600; font-size: .92rem; margin-bottom: 6px; }
+    .pilot-form label .req { color: var(--accent); }
+    .pilot-form input, .pilot-form select, .pilot-form textarea {
+      width: 100%; font: inherit; color: var(--ink); background: var(--surface);
+      border: 1px solid var(--line-strong); border-radius: 10px; padding: 10px 12px;
+    }
+    .pilot-form textarea { min-height: 96px; resize: vertical; }
+    .pilot-form input:focus, .pilot-form select:focus, .pilot-form textarea:focus {
+      outline: none; border-color: var(--accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+    }
+    .pilot-form [aria-invalid="true"] { border-color: var(--danger); }
+    .field-error { color: var(--danger); font-size: .85rem; margin-top: 5px; display: none; }
+    .field-error.show { display: block; }
+    .form-success { display: none; border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 10px; padding: 20px; }
+    .form-success.show { display: block; }
+    @media (max-width: 720px) { .pilot-form { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/" aria-label="Verity home"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C15.5 3.8 18 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>Verity</a>
+      <nav aria-label="Primary">
+        <a href="/product">Product</a>
+        <a href="/playground">Playground</a>
+        <a href="/documentation">Docs</a>
+        <a href="/pricing">Pricing</a>
+      </nav>
+      <div class="top-actions">
+        <a class="gh-link" href="https://github.com/KARTIKEYSINGH009/verity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg><span>GitHub</span></a>
+        <a href="/login" data-auth="signin">Sign in</a>
+        <a class="button primary btn-small" href="/signup" data-auth="start">Start free</a>
+        <a class="button primary btn-small" href="/dashboard" data-auth="dash" hidden>Dashboard</a>
+      </div>
+    </div>
+  </header>
+
+
+  <main>
+    <section class="block">
+      <div class="wrap">
+        <div class="page-head">
+          <p class="kicker">Pilot program</p>
+          <h2>Prove Verity on your AI workflow.</h2>
+          <p>A focused two-to-four-week pilot to test Verity on your real use case, with a dedicated deployment, clear success criteria, and a detailed report. For teams running customer-facing chatbots or internal copilots who need evidence — not a sales deck — before committing.</p>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <a class="button primary" href="#request">Request a pilot</a>
+          <a class="button secondary" href="https://www.linkedin.com/in/kartikeysingh-ks07/">Talk to the founder</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="wrap">
+        <div class="section-head"><h2>What you get.</h2></div>
+        <div class="layers">
+          <div class="layer"><b>Dedicated deployment</b><p>Your own Verity instance — not a shared tenant. Your database, your keys, your traces, isolated from other customers by architecture.</p></div>
+          <div class="layer"><b>Your policies enforced</b><p>Your business rules, modeled as policy and enforced on requests and responses — the refund ceilings, prohibited offers, and data your bot must never touch.</p></div>
+          <div class="layer"><b>Weekly report</b><p>Real results: blocked attacks with examples, false positives found and fixed, policy and judge verdicts — written by the founder from your traces.</p></div>
+          <div class="layer"><b>Clear verdict</b><p>At the end, a review against the success criteria agreed up front, stated plainly: what Verity caught, what it missed, and what it would take to close the gaps.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="wrap">
+        <div class="section-head"><h2>How the pilot works (2–4 weeks).</h2></div>
+        <div class="milestones">
+          <div class="milestone"><span class="id">1</span><div><strong>Scoping call</strong><p>We discuss your use case, policies, and risks — and decide together whether a pilot makes sense.</p></div></div>
+          <div class="milestone"><span class="id">2</span><div><strong>Success criteria, in writing</strong><p>What "works" means on your traffic, including a false-positive budget measured on your real support questions.</p></div></div>
+          <div class="milestone"><span class="id">3</span><div><strong>Provision &amp; verify</strong><p>Your dedicated deployment is configured with your policies, then passes a fixed verification battery — key enforcement, attack and policy blocks, your benign questions answered — before any traffic flows.</p></div></div>
+          <div class="milestone"><span class="id">4</span><div><strong>Run &amp; iterate</strong><p>Traffic flows through Verity; false positives are tuned via a human-reviewed corrections loop, with a report each week.</p></div></div>
+          <div class="milestone"><span class="id">5</span><div><strong>Final review</strong><p>Decide to continue, extend, or stop — based on evidence, measured against the criteria from step 2.</p></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="wrap">
+        <div class="layers">
+          <div class="layer"><b>Data handling</b><p>· Traces stored in your dedicated database<br>· Automatically deleted after 30 days (pruned on an ongoing basis; full deletion at pilot end, confirmed in writing)<br>· Never used for training — attack patterns are paraphrased and human-reviewed first<br>· Your provider key stays yours, entered only into your deployment's settings</p></div>
+          <div class="layer"><b>Honest limits</b><p>· Not an authorization system (see your own stack) — permission-check sensitive actions in your backend<br>· Streaming not supported yet — responses return complete<br>· Founder-led support (no 24×7 SLA)<br>· Early-stage product — the pilot exists to prove it on your traffic</p></div>
+        </div>
+        <p style="margin-top:18px;color:var(--muted)">What happens when the pilot ends: convert to a monthly engagement, extend once, or stop — in which case your deployment and data are deleted as described above and your traces can be exported to you first. Removing Verity is also one line: the same base-URL change, reversed.</p>
+      </div>
+    </section>
+
+    <section class="block" id="request">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Request a pilot.</h2>
+          <p>Tell us about your use case and we will get back to you for a scoping call. The founder reads every request personally and replies within two business days.</p>
+        </div>
+
+        <div class="form-alert" id="form-alert" role="alert"></div>
+
+        <div class="form-success" id="form-success" tabindex="-1">
+          <h3 style="margin-top:0">Request recorded.</h3>
+          <p style="margin-bottom:0">Your reference is <strong id="success-ref">—</strong>. The founder will reply to your work email within two business days. Your details are stored in Verity's database, read only by the founder, and never shared or added to a mailing list.</p>
+        </div>
+
+        <form class="pilot-form" id="pilot-form" novalidate>
+          <div>
+            <label for="f-company">Company name <span class="req" aria-hidden="true">*</span></label>
+            <input id="f-company" name="company" type="text" autocomplete="organization" required maxlength="120" />
+            <p class="field-error" data-for="company">Please add your company name.</p>
+          </div>
+          <div>
+            <label for="f-email">Work email <span class="req" aria-hidden="true">*</span></label>
+            <input id="f-email" name="email" type="email" autocomplete="email" required maxlength="254" />
+            <p class="field-error" data-for="email">Please add a valid work email.</p>
+          </div>
+          <div>
+            <label for="f-role">Your role</label>
+            <input id="f-role" name="role" type="text" autocomplete="organization-title" maxlength="80" placeholder="e.g. Founder / Product Lead" />
+          </div>
+          <div>
+            <label for="f-provider">Model provider</label>
+            <select id="f-provider" name="provider">
+              <option value="">Select…</option>
+              <option>OpenAI</option>
+              <option>Anthropic</option>
+              <option>Groq</option>
+              <option>Google (Gemini)</option>
+              <option>Azure OpenAI</option>
+              <option>Other / self-hosted</option>
+              <option>Not chosen yet</option>
+            </select>
+          </div>
+          <div class="full">
+            <label for="f-use-case">AI use case <span class="req" aria-hidden="true">*</span></label>
+            <textarea id="f-use-case" name="use_case" required maxlength="2000" placeholder="e.g. support chatbot, internal copilot, RAG assistant…"></textarea>
+            <p class="field-error" data-for="use_case">Please describe your use case in a sentence or two.</p>
+          </div>
+          <div>
+            <label for="f-volume">Estimated request volume</label>
+            <select id="f-volume" name="volume">
+              <option value="">Select…</option>
+              <option>Under 1k / month</option>
+              <option>1k–10k / month</option>
+              <option>10k–50k / month</option>
+              <option>50k–250k / month</option>
+              <option>Over 250k / month</option>
+              <option>Not sure yet</option>
+            </select>
+          </div>
+          <div>
+            <label for="f-timeline">Desired timeline</label>
+            <select id="f-timeline" name="timeline">
+              <option value="">Select…</option>
+              <option>Immediately</option>
+              <option>This month</option>
+              <option>This quarter</option>
+              <option>Exploring options</option>
+            </select>
+          </div>
+          <div class="full">
+            <label for="f-challenges">Current challenges</label>
+            <textarea id="f-challenges" name="challenges" maxlength="2000" placeholder="What worries you — jailbreaks, policy leaks, hallucinated refunds, compliance questions…"></textarea>
+          </div>
+          <div class="full">
+            <button class="button primary" type="submit" id="submit-btn">Send request</button>
+            <p class="form-note"><strong>Never include API keys, passwords, or customer data in this form.</strong> Your provider key is only ever entered into your own deployment's settings during provisioning. Submitting records your request in Verity's database; no email is auto-sent and your details are never shared.</p>
+          </div>
+        </form>
+        <p style="margin-top:22px;color:var(--muted)">Just evaluating for now? <a href="/signup">Create a free account</a> and test the gateway with your own key.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="cols">
+        <div>
+          <a class="brand" href="/" aria-label="Verity home"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C15.5 3.8 18 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>Verity</a>
+          <p class="tagline">Your AI security layer for real-world applications.</p>
+        </div>
+        <div><h4>Product</h4><ul>
+          <li><a href="/product">Architecture</a></li>
+          <li><a href="/playground">Playground</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li><a href="/pilot">Pilot</a></li>
+        </ul></div>
+        <div><h4>Resources</h4><ul>
+          <li><a href="/documentation">Documentation</a></li>
+          <li><a href="https://github.com/KARTIKEYSINGH009/verity">GitHub</a></li>
+          <li><a href="/benchmarks.json">Benchmark data</a></li>
+        </ul></div>
+        <div><h4>Legal &amp; contact</h4><ul>
+          <li><a href="/documentation#data">Security &amp; privacy</a></li>
+          <li><a href="/pilot#request">Request a pilot</a></li>
+          <li><a href="https://www.linkedin.com/in/kartikeysingh-ks07/">LinkedIn</a></li>
+        </ul></div>
+      </div>
+      <div class="base"><span>Built by Kartikey Singh</span><span>Current project snapshot · October 2026</span></div>
+    </div>
+  </footer>
+  <script src="/site.js" defer></script>
+  <script>
+    (function () {
+      var form = document.getElementById('pilot-form');
+      var alertBox = document.getElementById('form-alert');
+      var successBox = document.getElementById('form-success');
+      var submitBtn = document.getElementById('submit-btn');
+      var emailRe = /^[^@\s]{1,64}@[^@\s]{1,190}\.[^@\s]{2,}$/;
+
+      function fieldError(name, show) {
+        var err = form.querySelector('.field-error[data-for="' + name + '"]');
+        var input = form.elements[name];
+        if (err) err.classList.toggle('show', show);
+        if (input) input.setAttribute('aria-invalid', show ? 'true' : 'false');
+        return !show;
+      }
+      function validate(values) {
+        var ok = true;
+        ok = fieldError('company', !values.company.trim()) && ok;
+        ok = fieldError('email', !emailRe.test(values.email.trim())) && ok;
+        ok = fieldError('use_case', values.use_case.trim().length < 10) && ok;
+        return ok;
+      }
+      form.addEventListener('submit', async function (ev) {
+        ev.preventDefault();
+        alertBox.classList.remove('show');
+        var values = {};
+        ['company', 'email', 'role', 'use_case', 'provider', 'volume',
+         'challenges', 'timeline'].forEach(function (name) {
+          values[name] = form.elements[name] ? form.elements[name].value : '';
+        });
+        if (!validate(values)) {
+          alertBox.textContent = 'A couple of fields need attention — they are marked below.';
+          alertBox.classList.add('show');
+          return;
+        }
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Recording…';
+        try {
+          var resp = await fetch('/v1/pilot-requests', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(values)
+          });
+          var data = await resp.json().catch(function () { return {}; });
+          if (resp.status === 201) {
+            document.getElementById('success-ref').textContent = data.reference || '';
+            form.style.display = 'none';
+            successBox.classList.add('show');
+            successBox.focus();
+            return;
+          }
+          var detail = data.detail || {};
+          if (detail.error === 'secrets_not_accepted') {
+            alertBox.textContent = 'That submission included a field that looks like a secret. API keys and passwords must never be sent through this form — please remove it and resubmit.';
+          } else if (detail.error === 'validation_failed') {
+            (detail.fields || []).forEach(function (name) { fieldError(name, true); });
+            alertBox.textContent = 'A couple of fields need attention — they are marked below.';
+          } else if (resp.status === 429) {
+            alertBox.textContent = 'Too many requests from this connection. Please wait a minute and try again.';
+          } else {
+            alertBox.textContent = 'The request could not be recorded just now. Please try again in a moment.';
+          }
+          alertBox.classList.add('show');
+        } catch (err) {
+          alertBox.textContent = 'The request could not be recorded — the connection failed. Please check your network and try again.';
+          alertBox.classList.add('show');
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Send request';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

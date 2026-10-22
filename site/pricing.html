@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pricing — Verity</title>
+  <meta name="description" content="Verity pricing: a free tier with your own API key and dashboard, Pro in development, and founder-led pilot deployments with custom pricing." />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/" aria-label="Verity home"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C15.5 3.8 18 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>Verity</a>
+      <nav aria-label="Primary">
+        <a href="/product">Product</a>
+        <a href="/playground">Playground</a>
+        <a href="/documentation">Docs</a>
+        <a href="/pricing" aria-current="page">Pricing</a>
+      </nav>
+      <div class="top-actions">
+        <a class="gh-link" href="https://github.com/KARTIKEYSINGH009/verity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg><span>GitHub</span></a>
+        <a href="/login" data-auth="signin">Sign in</a>
+        <a class="button primary btn-small" href="/signup" data-auth="start">Start free</a>
+        <a class="button primary btn-small" href="/dashboard" data-auth="dash" hidden>Dashboard</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="block">
+      <div class="wrap">
+        <div class="page-head">
+          <p class="kicker">Pricing</p>
+          <h2>Start free. Scale as you grow.</h2>
+          <p>Choose the plan that fits your needs. Everything listed under a plan exists today unless it is explicitly marked as in development — and nothing is charged until a payment flow exists and confirms.</p>
+        </div>
+        <div class="layers">
+          <div class="layer"><b>Free</b><p style="font-size:1.5rem;color:var(--ink)"><strong>$0</strong> <span style="font-size:.95rem;color:var(--muted)">/ month</span></p><p>For developers evaluating Verity.</p><p>· Individual account with your own API key<br>· 1,000 gateway requests / month (enforced)<br>· Guard, policy checks and grounding evaluation<br>· Dashboard with your requests and traces<br>· 30-day trace history<br>· Community support via GitHub</p><p><a class="button primary" href="/signup">Get started free</a></p></div>
+          <div class="layer"><b>Pro</b><p style="font-size:1.1rem;color:var(--ink)"><strong>Pricing to be finalized</strong></p><p>For growing teams — in development.</p><p>· Higher request limits<br>· Live-model gateway (self-serve)<br>· Advanced policy configuration<br>· Longer trace retention<br>· Team workspaces<br>· Priority support</p><p style="color:var(--muted)">Pro is being shaped by pilot customers and opens to them first. Start free today; nothing about your account or key changes when Pro opens.</p><p><a class="button secondary" href="/signup">Start free first</a></p></div>
+          <div class="layer"><b>Pilot / Enterprise</b><p style="font-size:1.1rem;color:var(--ink)"><strong>Custom pricing</strong></p><p>For custom deployment, priced per engagement after a scoping call.</p><p>· Dedicated deployment, isolated by architecture<br>· Custom policies and rules for your business<br>· Agreed evaluation criteria, in writing<br>· Weekly founder reports from your traces<br>· Founder-led integration and support<br>· On-prem / VPC deployment options</p><p><a class="button primary" href="/pilot#request">Request a pilot</a></p></div>
+        </div>
+        <p style="margin-top:18px;color:var(--muted)">Prices are set from real running costs. The free tier runs on shared demo infrastructure with a mock model; pilot pricing reflects a dedicated deployment on your own provider account, where model spend stays yours.</p>
+      </div>
+    </section>
+
+    <section class="block faq">
+      <div class="wrap">
+        <div class="section-head"><h2>Frequently asked questions.</h2></div>
+        <details><summary>What happens when I hit the free limit?</summary><p>The gateway returns a <code>429 quota_exceeded</code> response for the rest of the month — your integration is never silently cut mid-request, and your dashboard shows the month's usage against the limit so it never surprises you.</p></details>
+        <details><summary>When will Pro pricing be announced?</summary><p>When the self-serve live gateway is ready to sell — pricing follows the real cost of running it, not a guess. Pilot customers get Pro access first.</p></details>
+        <details><summary>How does pilot pricing work?</summary><p>A fixed engagement price agreed after the scoping call and written into the pilot criteria — no per-seat or per-request surprises during the pilot itself.</p></details>
+        <details><summary>Can I get a dedicated deployment?</summary><p>Yes — that is the Pilot / Enterprise plan: your own deployment, keys and database. <a href="/pilot">See how pilots run</a>.</p></details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="cols">
+        <div>
+          <a class="brand" href="/" aria-label="Verity home"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C15.5 3.8 18 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>Verity</a>
+          <p class="tagline">Your AI security layer for real-world applications.</p>
+        </div>
+        <div><h4>Product</h4><ul>
+          <li><a href="/product">Architecture</a></li>
+          <li><a href="/playground">Playground</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li><a href="/pilot">Pilot</a></li>
+        </ul></div>
+        <div><h4>Resources</h4><ul>
+          <li><a href="/documentation">Documentation</a></li>
+          <li><a href="https://github.com/KARTIKEYSINGH009/verity">GitHub</a></li>
+          <li><a href="/benchmarks.json">Benchmark data</a></li>
+        </ul></div>
+        <div><h4>Legal &amp; contact</h4><ul>
+          <li><a href="/documentation#data">Security &amp; privacy</a></li>
+          <li><a href="/pilot#request">Request a pilot</a></li>
+          <li><a href="https://www.linkedin.com/in/kartikeysingh-ks07/">LinkedIn</a></li>
+        </ul></div>
+      </div>
+      <div class="base"><span>Built by Kartikey Singh</span><span>Current project snapshot · October 2026</span></div>
+    </div>
+  </footer>
+  <script src="/site.js" defer></script>
+</body>
+</html>

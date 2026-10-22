@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — Verity</title>
+  <meta name="description" content="Your Verity dashboard: overview, API keys, usage, traces, policies, billing and settings." />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .dash { display: grid; grid-template-columns: 210px 1fr; gap: 28px; align-items: start; }
+    .dash-side { position: sticky; top: 84px; border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: var(--surface); }
+    .dash-side .who { padding: 4px 8px 12px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+    .dash-side .who b { display: block; }
+    .dash-side .who span { color: var(--muted); font-size: .85rem; word-break: break-all; }
+    .dash-side a { display: block; padding: 8px; border-radius: 8px; color: var(--ink); text-decoration: none; }
+    .dash-side a:hover { background: var(--surface-2); }
+    .dash-main { display: grid; gap: 16px; min-width: 0; }
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .stat-num { font-size: 1.9rem; font-weight: 700; line-height: 1.1; }
+    .quota-meter { height: 8px; border-radius: 99px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; margin-top: 8px; }
+    .quota-meter i { display: block; height: 100%; background: var(--accent); width: 0%; }
+    .key-reveal { display: none; border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 10px; padding: 14px; margin-top: 12px; }
+    .key-reveal.show { display: block; }
+    .key-reveal code { display: block; margin-top: 6px; word-break: break-all; }
+    pre.code { background: var(--code-bg); color: #d7e0d8; border-radius: 10px; padding: 14px; overflow-x: auto; font-size: .85rem; line-height: 1.55; }
+    .trace-row { display: flex; gap: 10px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: .92rem; }
+    .trace-row:last-child { border-bottom: none; }
+    .trace-row .t-input { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .trace-row .t-time { color: var(--muted); white-space: nowrap; }
+    @media (max-width: 860px) {
+      .dash { grid-template-columns: 1fr; }
+      .dash-side { position: static; }
+      .stat-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <a class="brand" href="/" aria-label="Verity home"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C15.5 3.8 18 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>Verity</a>
+      <nav aria-label="Primary">
+        <a href="/product">Product</a>
+        <a href="/playground">Playground</a>
+        <a href="/documentation">Docs</a>
+        <a href="/pricing">Pricing</a>
+      </nav>
+      <div class="top-actions">
+        <a class="gh-link" href="https://github.com/KARTIKEYSINGH009/verity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg><span>GitHub</span></a>
+        <a href="/login" data-auth="signin">Sign in</a>
+        <a class="button primary btn-small" href="/signup" data-auth="start">Start free</a>
+        <a class="button primary btn-small" href="/dashboard" data-auth="dash" hidden>Dashboard</a>
+      </div>
+    </div>
+  </header>
+
+
+  <main>
+    <section class="block">
+      <div class="wrap">
+        <div class="dash">
+          <aside class="dash-side" aria-label="Dashboard sections">
+            <div class="who"><b id="who-company">Workspace</b><span id="who-email">Loading…</span></div>
+            <a href="#overview">Overview</a>
+            <a href="#keys">API Keys</a>
+            <a href="#usage">Usage</a>
+            <a href="#traces">Traces</a>
+            <a href="#policies">Policies</a>
+            <a href="#billing">Billing</a>
+            <a href="#settings">Settings</a>
+          </aside>
+
+          <div class="dash-main">
+            <div class="page-head" style="margin-bottom:0">
+              <p class="kicker">Dashboard</p>
+              <h2>Overview</h2>
+              <p id="plan-line">Loading your account…</p>
+            </div>
+
+            <div class="stat-grid" id="overview">
+              <div class="layer"><b>Total requests</b><p class="stat-num" id="stat-total">—</p><p style="color:var(--muted);margin:0">through your key</p></div>
+              <div class="layer"><b>Blocked</b><p class="stat-num" id="stat-blocked">—</p><p style="color:var(--muted);margin:0">stopped pre-model</p></div>
+              <div class="layer"><b>Avg. latency</b><p class="stat-num" id="stat-latency">—</p><p style="color:var(--muted);margin:0">gateway round-trip</p></div>
+              <div class="layer"><b>This month</b><p class="stat-num" id="stat-month">—</p><p style="color:var(--muted);margin:0" id="quota-line">of free quota</p><div class="quota-meter" aria-hidden="true"><i id="quota-bar"></i></div></div>
+            </div>
+
+            <div class="panel" id="keys">
+              <b>API Keys</b>
+              <p style="margin-bottom:10px">Current key: <code id="key-hint">—</code></p>
+              <button class="button secondary" id="regen-btn" type="button">Regenerate key</button>
+              <div class="key-reveal" id="key-reveal">
+                <strong>New key — shown only once. The old key has stopped working.</strong>
+                <code id="new-key"></code>
+              </div>
+              <p style="margin-top:12px;color:var(--muted);font-size:.92rem">Keys are stored only as hashes. Send yours as <code>Authorization: Bearer &lt;key&gt;</code> — the OpenAI client does this automatically when you set it as its <code>api_key</code>:</p>
+              <pre class="code" id="snippet">…</pre>
+            </div>
+
+            <div class="panel" id="usage">
+              <b>Usage</b>
+              <p id="usage-copy" style="margin-bottom:0">Loading…</p>
+            </div>
+
+            <div class="panel" id="traces">
+              <b>Recent security events &amp; traces</b>
+              <div id="trace-list"><p style="color:var(--muted)">Loading…</p></div>
+            </div>
+
+            <div class="panel" id="policies">
+              <b>Policies</b>
+              <p style="margin-bottom:0">Policies are currently supplied per request as a <code>policy_context</code> from your application — see the <a href="/documentation">documentation</a> for the format. A dashboard policy editor is planned with Pro; nothing about your current enforcement changes until it exists. Pilot customers have their policies configured during provisioning.</p>
+            </div>
+
+            <div class="panel" id="billing">
+              <b>Billing &amp; plan</b>
+              <p>Current plan: <strong id="plan-name">Free</strong>. <span id="billing-copy">No payment method on file — the free tier needs none.</span></p>
+              <p style="margin-bottom:0"><a class="button secondary" href="/pricing">Compare plans</a> <a class="button secondary" href="/pilot">Run a pilot instead</a></p>
+            </div>
+
+            <div class="panel" id="settings">
+              <b>Settings</b>
+              <p id="settings-copy" style="margin-bottom:10px">Loading…</p>
+              <button class="button secondary" id="logout-btn" type="button">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="cols">
+        <div>
+          <a class="brand" href="/" aria-label="Verity home"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C15.5 3.8 18 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>Verity</a>
+          <p class="tagline">Your AI security layer for real-world applications.</p>
+        </div>
+        <div><h4>Product</h4><ul>
+          <li><a href="/product">Architecture</a></li>
+          <li><a href="/playground">Playground</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li><a href="/pilot">Pilot</a></li>
+        </ul></div>
+        <div><h4>Resources</h4><ul>
+          <li><a href="/documentation">Documentation</a></li>
+          <li><a href="https://github.com/KARTIKEYSINGH009/verity">GitHub</a></li>
+          <li><a href="/benchmarks.json">Benchmark data</a></li>
+        </ul></div>
+        <div><h4>Legal &amp; contact</h4><ul>
+          <li><a href="/documentation#data">Security &amp; privacy</a></li>
+          <li><a href="/pilot#request">Request a pilot</a></li>
+          <li><a href="https://www.linkedin.com/in/kartikeysingh-ks07/">LinkedIn</a></li>
+        </ul></div>
+      </div>
+      <div class="base"><span>Built by Kartikey Singh</span><span>Current project snapshot · October 2026</span></div>
+    </div>
+  </footer>
+  <script src="/site.js" defer></script>
+  <script>
+    (function () {
+      function esc(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+      }
+      fetch('/v1/me').then(function (r) {
+        if (!r.ok) { location.href = '/login'; throw new Error('auth'); }
+        return r.json();
+      }).then(function (me) {
+        document.getElementById('who-company').textContent = me.user.company || 'Personal workspace';
+        document.getElementById('who-email').textContent = me.user.email;
+        document.getElementById('plan-line').textContent =
+          'Signed in as ' + me.user.email + ' · plan: ' + me.user.plan + '. Everything here is scoped to your key only.';
+        document.getElementById('plan-name').textContent =
+          me.user.plan.charAt(0).toUpperCase() + me.user.plan.slice(1);
+        document.getElementById('key-hint').textContent = me.api_key_hint || '—';
+        document.getElementById('stat-total').textContent = me.usage.total;
+        document.getElementById('stat-blocked').textContent = me.usage.blocked;
+        document.getElementById('stat-latency').textContent =
+          me.usage.total ? Math.round(me.usage.avg_latency_ms) + ' ms' : '—';
+        document.getElementById('stat-month').textContent = me.usage.month_total;
+        if (me.quota) {
+          var limit = me.quota.limit_per_month;
+          document.getElementById('quota-line').textContent = 'of ' + limit.toLocaleString() + ' free / month';
+          document.getElementById('quota-bar').style.width =
+            Math.min(100, Math.round(me.usage.month_total / limit * 100)) + '%';
+          document.getElementById('usage-copy').textContent =
+            'Free plan: ' + me.usage.month_total + ' of ' + limit.toLocaleString() +
+            ' requests used this month. At the limit the gateway answers 429 quota_exceeded until the month resets — your dashboard keeps working and nothing is billed.';
+        } else {
+          document.getElementById('quota-line').textContent = 'this month';
+          document.getElementById('usage-copy').textContent =
+            me.usage.month_total + ' requests this month on your plan.';
+        }
+        document.getElementById('snippet').textContent =
+          'client = OpenAI(\n  base_url="' + location.origin + '/v1",\n  api_key="vk-…")  # your key';
+        document.getElementById('settings-copy').textContent =
+          'Account: ' + me.user.email + (me.user.company ? ' · Company: ' + me.user.company : '') +
+          ' · Plan: ' + me.user.plan + '. To change your email or delete your account and data, contact the founder via the pilot page — deletion is confirmed in writing.';
+        var list = document.getElementById('trace-list');
+        if (!me.traces.length) {
+          list.innerHTML = '<p style="color:var(--muted)">No requests yet with your key. Make a call with the snippet above and it will appear here.</p>';
+        } else {
+          list.innerHTML = me.traces.map(function (t) {
+            var when = new Date(t.ts * 1000).toLocaleString();
+            var verdict = t.blocked
+              ? '<span class="verdict block">BLOCKED</span>'
+              : '<span class="verdict pass">PASSED</span>';
+            var faith = (t.faithfulness === null || t.faithfulness === undefined)
+              ? '' : ' · faithfulness ' + Number(t.faithfulness).toFixed(2);
+            return '<div class="trace-row"><span class="t-time">' + esc(when) + '</span>' +
+              '<span class="t-input">' + esc(t.input_text) + '</span>' +
+              '<span>' + verdict + faith + '</span></div>';
+          }).join('');
+        }
+      }).catch(function () { /* redirect handled */ });
+
+      document.getElementById('regen-btn').addEventListener('click', async function () {
+        if (!confirm('Regenerate your API key? The current key stops working immediately.')) return;
+        var resp = await fetch('/v1/keys/regenerate', { method: 'POST' });
+        if (!resp.ok) { location.href = '/login'; return; }
+        var data = await resp.json();
+        document.getElementById('new-key').textContent = data.api_key;
+        document.getElementById('key-reveal').classList.add('show');
+        document.getElementById('key-hint').textContent = 'vk-…' + data.api_key.slice(-4);
+      });
+
+      document.getElementById('logout-btn').addEventListener('click', async function () {
+        await fetch('/v1/auth/logout', { method: 'POST' });
+        location.href = '/login';
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -45,6 +45,21 @@ ENABLE_DOCS = os.getenv("VERITY_ENABLE_DOCS", "false").lower() == "true"
 # Trace retention: rows older than this many days are pruned on write,
 # so the SQLite log cannot grow without bound. 0 disables pruning.
 TRACE_RETENTION_DAYS = _int_env("VERITY_TRACE_RETENTION_DAYS", 30)
+# Pilot intake (POST /v1/pilot-requests, the public /pilot form) belongs
+# on the public site only. Client deployments set this to false so a
+# stranger's form submission can never land in a client's database.
+PILOT_INTAKE = os.getenv("VERITY_PILOT_INTAKE", "true").lower() == "true"
+# Google sign-in (OAuth 2.0). Both values come from the Google Cloud
+# console for the production origin; when either is empty the Google
+# button is disabled on the auth pages and the start endpoint 404s —
+# password auth keeps working. The redirect URI registered with Google
+# must be <site origin>/v1/auth/google/callback (or the base below).
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+OAUTH_REDIRECT_BASE = os.getenv("VERITY_OAUTH_REDIRECT_BASE", "")
+# Free-plan monthly request quota for portal-issued keys, enforced by
+# the gateway (counted from the key's own traces). 0 disables it.
+FREE_MONTHLY_QUOTA = _int_env("VERITY_FREE_MONTHLY_QUOTA", 1000)
 # Client API keys for /v1/chat/completions (audit F2). Clients present
 # their key as "Authorization: Bearer <key>" — the OpenAI client does
 # this automatically when its api_key is set to the Verity key. Give
