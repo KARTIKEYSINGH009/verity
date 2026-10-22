@@ -111,5 +111,18 @@ the loader merges any number of parts and stays backward compatible
 with two-part models. Push order: part3, part2 first (inert), loader
 + part1 last.
 
-Tests: 203 passing, including tests/test_deephat_round2.py (the 22
+Tests: 204 passing, including tests/test_deephat_round2.py (the 22
 in-scope attacks as regressions + 10 benign near-misses).
+
+## Addendum — production fuzz found one more crash (fixed same day)
+
+The 35-probe fuzz run against PRODUCTION (local was clean) caught a
+500 the local suite could not see: a chat message containing a NUL
+byte. Postgres TEXT rejects NUL bytes (and lone surrogates); SQLite
+tolerates both, so trace logging crashed only on Neon. Fixed at the
+store boundary: `_db_text()` strips NULs and replaces unencodable
+surrogates on every text insert (traces, pilot requests, user
+company/email). Regression test: test_store_strips_nul_and_surrogates.
+Production battery result: 22/24 blocked, identical to local, with
+the new rules firing live (pii_fields_extract, embeddings_extract,
+exfil_link, prompt_extract_generic).

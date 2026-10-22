@@ -226,3 +226,17 @@ def test_login_rejects_null_credentials(client):
         "email": None, "password": None})
     assert r.status_code == 400
     assert r.json()["detail"]["error"] == "validation_failed"
+
+
+def test_store_strips_nul_and_surrogates(client):
+    """Postgres TEXT rejects NUL bytes and lone surrogates (SQLite
+    tolerates both — the production-only 500 from the round-2 fuzz).
+    Everything persisted must be cleaned at the store boundary."""
+    tid = store.log_trace("mock", "a\x00b\ud800c", "out\x00put", 1.5,
+                          blocked=False, flags=(), faithfulness=None,
+                          client_id="fuzz")
+    rows = store.recent_traces(5, client_id="fuzz")
+    row = [r for r in rows if r["id"] == tid][0]
+    assert "\x00" not in row["input_text"]
+    assert "\x00" not in row["output_text"]
+    assert row["input_text"] == "ab?c"

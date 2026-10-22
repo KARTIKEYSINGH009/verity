@@ -309,9 +309,26 @@ def init_db() -> None:
         _sqlite_init()
 
 
+def _db_text(value):
+    """Make a string safe to persist on either backend.
+
+    Postgres TEXT rejects NUL bytes and lone surrogates, both of
+    which a JSON payload can carry; SQLite tolerates them, which hid
+    a production-only 500 (found by the round-2 Deep Hat fuzz run,
+    2026-10-22) behind green local tests. Valid text passes through
+    unchanged."""
+    if not isinstance(value, str):
+        return value
+    return (value.replace("\x00", "")
+            .encode("utf-8", "replace").decode("utf-8", "replace"))
+
+
 def log_trace(model, input_text, output_text, latency_ms,
               blocked=False, flags=(), faithfulness=None,
               client_id="") -> int:
+    model, input_text, output_text, client_id = (
+        _db_text(model), _db_text(input_text), _db_text(output_text),
+        _db_text(client_id))
     if _use_postgres():
         return _pg_log(model, input_text, output_text, latency_ms,
                        blocked, flags, faithfulness, client_id)
@@ -356,8 +373,9 @@ def log_pilot_request(company, email, role="", use_case="", provider="",
     """Record a pilot request from the public /pilot form. Contact and
     scoping details only — never credentials (the endpoint rejects
     secret-shaped fields before this is called)."""
-    values = (company, email, role, use_case, provider, volume,
-              challenges, timeline)
+    values = tuple(_db_text(v) for v in
+                   (company, email, role, use_case, provider, volume,
+                    challenges, timeline))
     if _use_postgres():
         return _pg_log_pilot_request(values)
     return _sqlite_log_pilot_request(values)
@@ -425,6 +443,7 @@ def _rows(sqlite_sql, pg_sql, params=(), fetch="all"):
 
 
 def create_user(email, pw_hash, company="", email_verified=True) -> int:
+    email, company = _db_text(email), _db_text(company)
     _ensure_auth_schema()
     try:
         return _rows(
