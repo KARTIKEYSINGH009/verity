@@ -35,7 +35,7 @@ def build_judge_prompt(context: str, answer: str) -> list[dict]:
 
 def parse_judge_response(text: str) -> dict:
     """Parse the judge's JSON, tolerating markdown fences and stray text."""
-    cleaned = re.sub(r"^```(?:json)?|```$", "", text.strip(),
+    cleaned = re.sub(r"^```(?:json)?|```$", "", (text or "").strip(),
                      flags=re.MULTILINE).strip()
     try:
         data = json.loads(cleaned)
@@ -79,7 +79,17 @@ def judge_faithfulness(context: str, answer: str) -> dict:
             f"{base['grounded_sentences']}/{base['total_sentences']} "
             "sentences are at least half-supported by the context")
         return base
-    raw = _call_judge_model(build_judge_prompt(context, answer))
+    try:
+        raw = _call_judge_model(build_judge_prompt(context, answer))
+    except Exception:
+        # Audit #21: a judge outage (429/timeout/5xx) must never 500 a
+        # completion that already succeeded — fall back to the
+        # heuristic scorer, and say so in the method label.
+        base = heuristic_score(context, answer)
+        base["method"] = "heuristic (judge unavailable)"
+        base["rationale"] = (
+            "judge model call failed; heuristic fallback used")
+        return base
     result = parse_judge_response(raw)
     result["method"] = f"llm_judge:{config.JUDGE_MODEL}"
     return result

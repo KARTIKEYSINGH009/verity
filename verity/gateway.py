@@ -4,6 +4,7 @@ Drop-in replacement for the OpenAI chat-completions endpoint:
 point your client at http://<verity-host>:8000/v1 instead of
 https://api.openai.com/v1. Everything else stays the same.
 """
+import asyncio
 import hashlib
 import hmac
 import re
@@ -167,10 +168,12 @@ def health():
 
 
 def _client_id(authorization: str | None) -> str:
-    """Stable per-client identity for traces: a hash prefix of the
-    presented client key (never the raw key, which must not be stored).
-    Only recognized keys are stamped — env-configured keys and
-    portal-issued keys; anonymous demo traffic stays unstamped."""
+    """Stable per-client identity for traces. Env-configured keys stamp
+    as a hash prefix of the key. Portal-issued keys stamp as
+    ``user:<id>`` — bound to the ACCOUNT, not the key (audit #19):
+    keying usage/traces by key hash let a free user reset their monthly
+    quota (and wipe their dashboard history) by regenerating their key.
+    Anonymous demo traffic stays unstamped."""
     if not authorization:
         return ""
     token = authorization.removeprefix("Bearer ").strip()
@@ -179,8 +182,9 @@ def _client_id(authorization: str | None) -> str:
     digest = hashlib.sha256(token.encode()).hexdigest()
     if any(hmac.compare_digest(token, k) for k in config.CLIENT_KEYS):
         return digest[:12]
-    if find_api_key(digest) is not None:
-        return digest[:12]
+    row = find_api_key(digest)
+    if row is not None:
+        return f"user:{row['user_id']}"
     return ""
 
 
@@ -362,6 +366,29 @@ def _session_user(request: Request):
         return None
     return get_user_by_session(
         hashlib.sha256(token.encode()).hexdigest())
+
+
+def _require_same_origin(request: Request) -> None:
+    """CSRF defense-in-depth for cookie-authenticated POST mutations
+    (audit #23). SameSite=Lax alone is not the only line: when the
+    browser sends an Origin header it must match this deployment's own
+    host (proxy-forwarded host/proto honored, since Vercel terminates
+    TLS in front of the function). Requests with no Origin header —
+    curl, server-to-server, same-origin navigations — are allowed;
+    browsers always send Origin on cross-site POSTs, which is exactly
+    the forgery case this stops."""
+    origin = request.headers.get("origin")
+    if not origin:
+        return
+    allowed = {f"{request.url.scheme}://{request.url.netloc}"}
+    host = (request.headers.get("x-forwarded-host")
+            or request.headers.get("host"))
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    if host:
+        allowed.add(f"{proto}://{host}")
+    if origin.rstrip("/") not in allowed:
+        raise HTTPException(status_code=403,
+                            detail={"error": "cross_origin_forbidden"})
 
 
 def _start_session(request: Request, payload: dict,
@@ -547,6 +574,7 @@ async def auth_login(request: Request):
 
 @app.post("/v1/auth/logout")
 def auth_logout(request: Request):
+    _require_same_origin(request)
     token = request.cookies.get(_SESSION_COOKIE, "")
     if token:
         delete_session(hashlib.sha256(token.encode()).hexdigest())
@@ -572,7 +600,7 @@ def me(request: Request):
                    user["id"])["opt_in"],
                "traces": []}
     if key:
-        client_id = key["key_hash"][:12]
+        client_id = f"user:{user['id']}"
         payload["api_key_hint"] = "vk-…" + key["key_hint"]
         payload["usage"] = usage_for_client(
             client_id, since_ts=_month_start_ts())
@@ -587,6 +615,7 @@ def me(request: Request):
 
 @app.post("/v1/me/preferences")
 async def me_preferences(request: Request):
+    _require_same_origin(request)
     user = _session_user(request)
     if not user:
         raise HTTPException(status_code=401,
@@ -618,6 +647,7 @@ async def email_unsubscribe(request: Request):
 
 @app.post("/v1/keys/regenerate")
 def regenerate_key(request: Request):
+    _require_same_origin(request)
     user = _session_user(request)
     if not user:
         raise HTTPException(status_code=401,
@@ -647,7 +677,8 @@ def _enforce_free_quota(authorization: str | None) -> None:
     user = get_user_by_id(key_row["user_id"])
     if not user or user["plan"] != "free":
         return
-    usage = usage_for_client(digest[:12], since_ts=_month_start_ts())
+    usage = usage_for_client(f"user:{key_row['user_id']}",
+                             since_ts=_month_start_ts())
     if usage["month_total"] >= config.FREE_MONTHLY_QUOTA:
         raise HTTPException(status_code=429, detail={
             "error": "quota_exceeded", "plan": "free",
@@ -675,6 +706,7 @@ async def auth_verify_email(request: Request):
 
 @app.post("/v1/auth/resend-verification")
 async def auth_resend_verification(request: Request):
+    _require_same_origin(request)
     user = _session_user(request)
     if not user:
         raise HTTPException(status_code=401,
@@ -925,13 +957,17 @@ async def chat_completions(req: ChatRequest, request: Request,
             {"model": req.model,
              "messages": [m.model_dump() for m in req.messages]})
 
-    answer = result["choices"][0]["message"]["content"]
+    # Tool-call completions carry content=None per the OpenAI spec
+    # (audit #20) — coerce defensively instead of 500ing downstream.
+    _msg = (result.get("choices") or [{}])[0].get("message") or {}
+    answer = _msg.get("content") or ""
 
     # 2b. Policy guard (response side): even if the model complied with a
     # prohibited action, its answer never reaches the user.
     policy_result = None
     if req.policy_context:
-        policy_result = policy_check_response(req.policy_context, answer)
+        policy_result = await asyncio.to_thread(
+            policy_check_response, req.policy_context, answer)
         if policy_result["violates"]:
             pflags = list(flags) + ["policy_violation"]
             latency_ms = (time.perf_counter() - started) * 1000
@@ -946,7 +982,8 @@ async def chat_completions(req: ChatRequest, request: Request,
     # Milestone 2: LLM-as-judge is primary, heuristic kept as fallback/detail.
     score = None
     if req.grounding_context and config.JUDGE_ENABLED:
-        score = judge_faithfulness(req.grounding_context, answer)
+        score = await asyncio.to_thread(
+            judge_faithfulness, req.grounding_context, answer)
     elif req.grounding_context:
         score = faithfulness_score(req.grounding_context, answer)
         score["method"] = "heuristic"

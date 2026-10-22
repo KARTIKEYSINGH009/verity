@@ -327,8 +327,8 @@ def log_trace(model, input_text, output_text, latency_ms,
               blocked=False, flags=(), faithfulness=None,
               client_id="") -> int:
     model, input_text, output_text, client_id = (
-        _db_text(model), _db_text(input_text), _db_text(output_text),
-        _db_text(client_id))
+        _db_text(model) or "", _db_text(input_text) or "",
+        _db_text(output_text) or "", _db_text(client_id) or "")
     if _use_postgres():
         return _pg_log(model, input_text, output_text, latency_ms,
                        blocked, flags, faithfulness, client_id)
