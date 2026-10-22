@@ -217,9 +217,9 @@ h1 {
 .proof-item span { color: var(--muted); font-size: .86rem; }
 
 section.block { padding: 72px 0; }
-.section-head { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: end; margin-bottom: 44px; }
-.section-head h2 { margin: 0; font-size: clamp(1.9rem, 3.6vw, 2.9rem); line-height: 1.08; font-weight: 650; letter-spacing: -.028em; }
-.section-head p { margin: 0; color: var(--muted); max-width: 530px; justify-self: end; }
+.section-head { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; margin-bottom: 44px; }
+.section-head h2 { margin: 0; font-size: clamp(1.9rem, 3.6vw, 2.9rem); line-height: 1.08; font-weight: 650; letter-spacing: -.028em; max-width: 820px; }
+.section-head p { margin: 0; color: var(--muted); max-width: 720px; justify-self: start; }
 
 .playground-shell { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
 .tabs { display: flex; border-bottom: 1px solid var(--line); background: var(--surface-2); }
@@ -693,3 +693,29 @@ form select:focus, .auth-form select:focus { outline: none; border-color: var(--
   .dash-side a { display: inline-flex; padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: .85rem; }
   .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 }
+
+/* --- Homepage layout fix 2026-10-22 (founder screenshots) --- */
+/* Sections get a hairline separator + optional tint so they never blur together */
+main section.block { border-top: 1px solid var(--line); }
+main section.block.tint { background: var(--surface-2); }
+.docs-content section.block { border-top: 0; }
+#preview { border-top: 0; }
+.section-head h1 { max-width: 820px; }
+/* Why recall = precision = F1 on this run, stated on the page itself */
+.bench-equal-note { margin: 14px 0 0; color: var(--muted); font-size: .88rem; border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px 14px; background: var(--surface); }
+.bench-equal-note b { color: var(--ink); }
+/* Integration: right column stacks quickstart + live curl demo, filling the column */
+.integration-side { display: grid; gap: 14px; align-content: start; min-width: 0; }
+.demo-curl-wrap { min-width: 0; }
+.demo-curl-label { margin: 0 0 8px; font-size: .84rem; font-weight: 650; color: var(--muted); }
+.demo-curl { margin: 0; background: var(--code-bg); color: var(--code-ink); border: 1px solid var(--code-line); border-radius: var(--r-md); padding: 18px; overflow-x: auto; font: .78rem/1.7 var(--mono); white-space: pre; max-width: 100%; }
+/* Trust: real cards, data handling split by context */
+.trust-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 40px; }
+.trust-card { border: 1px solid var(--line); border-radius: var(--r-md); padding: 22px; background: var(--surface); min-width: 0; }
+.trust-card > b { display: block; font-size: 1.12rem; font-weight: 650; letter-spacing: -.015em; margin-bottom: 8px; }
+.trust-card p { margin: 0; color: var(--muted); font-size: .92rem; }
+.trust-card.wide { grid-column: 1 / -1; }
+.trust-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; margin-top: 12px; }
+.trust-cols .t-sub b { display: block; color: var(--ink); font-size: .95rem; margin-bottom: 5px; }
+.trust-note { margin-top: 16px !important; padding-top: 14px; border-top: 1px solid var(--line); }
+@media (max-width: 900px) { .trust-cols { grid-template-columns: 1fr; } .trust-grid { grid-template-columns: 1fr; } }

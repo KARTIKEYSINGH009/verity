@@ -81,7 +81,7 @@
 
         <div class="stats">
       <div class="wrap stats-grid" aria-label="Project status">
-        <div class="stat"><div class="stat-top"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C15.5 3.8 18 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span><strong id="stat-recall">92.0%</strong></div><span>Attack recall (combined detector)</span></div><div class="stat"><div class="stat-top"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></span><strong id="stat-precision">92.0%</strong></div><span>Precision</span></div><div class="stat"><div class="stat-top"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M8 16v-5M13 16V8M18 16v-8"/></svg></span><strong id="stat-fpr">10.0%</strong></div><span>False positive rate</span></div><div class="stat"><div class="stat-top"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg></span><strong id="stat-latency">0.28 ms</strong></div><span>Median screening latency (local benchmark)</span></div><div class="stat"><div class="stat-top"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg></span><strong>204 / 204</strong></div><span>Tests passing (unit + integration)</span></div>
+        <div class="stat"><div class="stat-top"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C15.5 3.8 18 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span><strong id="stat-recall">92.0%</strong></div><span>Attack recall (combined) · <span id="stat-recall-sub">23 / 25 attacks detected</span></span></div><div class="stat"><div class="stat-top"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></span><strong id="stat-precision">92.0%</strong></div><span>Precision · <span id="stat-precision-sub">23 / 25 flagged were attacks</span></span></div><div class="stat"><div class="stat-top"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M8 16v-5M13 16V8M18 16v-8"/></svg></span><strong id="stat-fpr">10.0%</strong></div><span>False positive rate · <span id="stat-fpr-sub">2 / 20 benign flagged</span></span></div><div class="stat"><div class="stat-top"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg></span><strong id="stat-latency">0.28 ms</strong></div><span>Median screening latency (local benchmark)</span></div><div class="stat"><div class="stat-top"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg></span><strong>204 / 204</strong></div><span>Tests passing (unit + integration)</span></div>
       </div>
     </div>
 
@@ -104,7 +104,7 @@
       </div>
     </section>
 
-        <section class="block" id="benchmarks">
+        <section class="block tint" id="benchmarks">
       <div class="wrap">
         <div class="section-head">
           <h2>Measured, not promised.</h2>
@@ -114,8 +114,9 @@
           <div class="meter-card"><strong id="meter-recall">92.0%</strong><div class="m-label">Attack recall</div><div class="bar"><i id="meter-recall-bar" style="width:92%"></i></div><div class="m-sub" id="meter-recall-sub">23 / 25 attacks detected</div></div>
           <div class="meter-card"><strong id="meter-precision">92.0%</strong><div class="m-label">Precision</div><div class="bar"><i id="meter-precision-bar" style="width:92%"></i></div><div class="m-sub" id="meter-precision-sub">23 / 25 flagged were attacks</div></div>
           <div class="meter-card"><strong id="meter-fpr">10.0%</strong><div class="m-label">False positive rate</div><div class="bar"><i id="meter-fpr-bar" style="width:10%"></i></div><div class="m-sub" id="meter-fpr-sub">2 / 20 benign flagged</div></div>
-          <div class="meter-card"><strong id="meter-f1">92.0%</strong><div class="m-label">F1 score</div><div class="bar"><i id="meter-f1-bar" style="width:92%"></i></div><div class="m-sub">Combined guard, held-out set</div></div>
+          <div class="meter-card"><strong id="meter-f1">92.0%</strong><div class="m-label">F1 score</div><div class="bar"><i id="meter-f1-bar" style="width:92%"></i></div><div class="m-sub" id="meter-f1-sub">TP 23 · FP 2 · FN 2</div></div>
         </div>
+        <p class="bench-equal-note" id="equal-note"><b>Why recall, precision and F1 all read 92.0%:</b> they are three different ratios that coincide on this run — the guard missed 2 attacks (recall 23/25) and flagged 2 benign prompts (precision 23/25), and F1 is their harmonic mean. Raw counts are in the cards above and in benchmarks.json.</p>
         <div class="bench-grid">
           <div>
             <div class="bench-note"><b>Rules alone: 4% recall</b><p>Heuristic patterns caught 1 of the 25 held-out attacks — they only fire on attacks phrased like known patterns. On novel wording they are a safety net, not a shield — which is why the learned layer exists.</p></div>
@@ -236,14 +237,8 @@
             <li>Public-endpoint abuse controls: 20k-char input cap, per-client rate limit</li>
             <li>Graceful fallback when judge or classifier is unavailable</li>
           </ul>
-          <pre style="margin-top:18px"><span class="cmt"># curl, against the live demo</span>
-curl -X POST https://verity-nine-flame.vercel.app/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"model":"gpt-4o-mini",
-       "messages":[{"role":"user","content":"refund my money"}],
-       "policy_context":"All sales are final. No refunds are offered."}'
-<span class="cmt"># → 400 {"error":"blocked_by_verity_policy", ...}</span></pre>
         </div>
+        <div class="integration-side">
         <div class="code-window" aria-label="Quickstart code example">
           <pre id="quickstart"><span class="cmt"># Start Verity locally</span>
 pip install -r requirements.txt
@@ -256,6 +251,17 @@ client = OpenAI(
     <span class="key">api_key</span>=<span class="str">"your-provider-key"</span>
 )</pre>
           <div class="copy-row"><span id="copy-status">localhost quickstart</span><button class="copy-code" id="copy-code">Copy code</button></div>
+        </div>
+        <div class="demo-curl-wrap">
+          <p class="demo-curl-label">Try it — curl against the live demo</p>
+          <pre class="demo-curl"><span class="cmt"># curl, against the live demo</span>
+curl -X POST https://verity-nine-flame.vercel.app/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-4o-mini",
+       "messages":[{"role":"user","content":"refund my money"}],
+       "policy_context":"All sales are final. No refunds are offered."}'
+<span class="cmt"># → 400 {"error":"blocked_by_verity_policy", ...}</span></pre>
+        </div>
         </div>
       </div>
     </section>
@@ -278,16 +284,24 @@ client = OpenAI(
       </div>
     </section>
 
-    <section class="block" id="trust">
+    <section class="block tint" id="trust">
       <div class="wrap">
         <div class="section-head">
           <h2>Trust, stated plainly.</h2>
           <p>Verity inspects AI traffic, so its own behavior has to be inspectable too.</p>
         </div>
-        <div class="layers">
-          <div class="layer"><b>Open source (MIT)</b><p>Full source, training data, and benchmark scripts are public under the MIT license: <a href="https://github.com/KARTIKEYSINGH009/verity">github.com/KARTIKEYSINGH009/verity</a>. Found a bypass? That is a contribution — new attacks enter the reviewed corrections loop and make the next model stronger.</p></div>
-          <div class="layer"><b>Data handling</b><p>Three contexts, three distinct answers. Your own deployment (pilot or self-hosted): traces (inputs, outputs, flags, latency) live in your database under your retention — 30 days by default; in live mode, answer text is sent to your chosen judge model under your provider key. A free account on this site: traces made with your API key are stored in this site's database and are visible only to you, in your dashboard. The public playground (no account): requests run against a mock model and are logged to the same database, pruned after 30 days like all traces — but they are attached to no account, appear in no dashboard, and the admin traces endpoint is disabled on this deployment, because traces contain raw prompts. Found a vulnerability? Please report it through GitHub Security Advisories on the repository instead of opening a public issue.</p></div>
-          <div class="layer"><b>Screening is not authorization</b><p>Verity classifies content and enforces declared policy on requests and answers. It is not an authorization system: sensitive actions (refunds, transfers, record changes) must also be permission-checked at your tool and backend boundary. Never let a model answer alone authorize one.</p></div>
+        <div class="trust-grid">
+          <div class="trust-card"><b>Open source (MIT)</b><p>Full source, training data, and benchmark scripts are public under the MIT license: <a href="https://github.com/KARTIKEYSINGH009/verity">github.com/KARTIKEYSINGH009/verity</a>. Found a bypass? That is a contribution — new attacks enter the reviewed corrections loop and make the next model stronger.</p></div>
+          <div class="trust-card"><b>Screening is not authorization</b><p>Verity classifies content and enforces declared policy on requests and answers. It is not an authorization system: sensitive actions (refunds, transfers, record changes) must also be permission-checked at your tool and backend boundary. Never let a model answer alone authorize one.</p></div>
+          <div class="trust-card wide"><b>Data handling</b>
+            <p>Three contexts, three distinct answers.</p>
+            <div class="trust-cols">
+              <div class="t-sub"><b>Your own deployment</b><p>Pilot or self-hosted: traces (inputs, outputs, flags, latency) live in your database under your retention — 30 days by default. In live mode, answer text is sent to your chosen judge model under your provider key.</p></div>
+              <div class="t-sub"><b>Free account on this site</b><p>Traces made with your API key are stored in this site's database and are visible only to you, in your dashboard.</p></div>
+              <div class="t-sub"><b>Public playground</b><p>No account: requests run against a mock model and are logged to the same database, pruned after 30 days like all traces — but attached to no account, visible in no dashboard, and the admin traces endpoint is disabled on this deployment, because traces contain raw prompts.</p></div>
+            </div>
+            <p class="trust-note">Found a vulnerability? Please report it through GitHub Security Advisories on the repository instead of opening a public issue.</p>
+          </div>
         </div>
       </div>
     </section>
@@ -305,7 +319,7 @@ client = OpenAI(
         <p style="margin-top:18px;color:var(--muted);font-size:.95rem">There is no self-serve checkout yet, deliberately: pilots are onboarded manually so each deployment is verified end-to-end before traffic flows. Engagement pricing is set after a short scoping conversation.</p>
       </div>
     </section>
-    <section class="block" id="use-cases">
+    <section class="block tint" id="use-cases">
       <div class="wrap">
         <div class="section-head">
           <h2>Where Verity fits.</h2>
@@ -441,6 +455,12 @@ client = OpenAI(
         set('meter-recall-sub', c.tp + ' / ' + d.malicious + ' attacks detected');
         set('meter-precision-sub', c.tp + ' / ' + (c.tp + c.fp) + ' flagged were attacks');
         set('meter-fpr-sub', c.fp + ' / ' + d.benign + ' benign flagged');
+        set('stat-recall-sub', c.tp + ' / ' + d.malicious + ' attacks detected');
+        set('stat-precision-sub', c.tp + ' / ' + (c.tp + c.fp) + ' flagged were attacks');
+        set('stat-fpr-sub', c.fp + ' / ' + d.benign + ' benign flagged');
+        set('meter-f1-sub', 'TP ' + c.tp + ' \u00b7 FP ' + c.fp + ' \u00b7 FN ' + c.fn);
+        var en = document.getElementById('equal-note');
+        if (en) en.innerHTML = '<b>Why recall, precision and F1 ' + (c.recall === c.precision ? 'all read ' + pct(c.recall, 1) : 'differ') + ':</b> three different ratios — recall is ' + c.tp + '/' + d.malicious + ' attacks detected, precision is ' + c.tp + '/' + (c.tp + c.fp) + ' flagged that were attacks, F1 is their harmonic mean. Raw counts are in the cards above and in benchmarks.json.';
         var rb = document.getElementById('meter-recall-bar'); if (rb) rb.style.width = (c.recall * 100) + '%';
         var pb = document.getElementById('meter-precision-bar'); if (pb) pb.style.width = (c.precision * 100) + '%';
         var fb = document.getElementById('meter-fpr-bar'); if (fb) fb.style.width = (c.false_positive_rate * 100) + '%';
