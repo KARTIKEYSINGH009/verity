@@ -9,10 +9,12 @@ from verity.store import init_db, recent_traces
 
 st.set_page_config(page_title="Verity dashboard", layout="wide")
 
-# Password gate (audit F1): traces contain raw prompts and answers, so a
-# deployed dashboard must never render them without a login. Set
-# VERITY_DASHBOARD_PASSWORD before deploying this app anywhere. Local
-# use without a password still works — but says so, loudly.
+# Password gate (audit F1, hardened in batch 2 / finding 3): traces
+# contain raw prompts and answers, so this dashboard must never render
+# them without a login. It now FAILS CLOSED: with no
+# VERITY_DASHBOARD_PASSWORD set it refuses to display anything, unless
+# the operator explicitly opts into unauthenticated local use with
+# VERITY_DASHBOARD_ALLOW_UNAUTHENTICATED=true.
 _DASHBOARD_PASSWORD = os.getenv("VERITY_DASHBOARD_PASSWORD", "")
 if _DASHBOARD_PASSWORD:
     if not st.session_state.get("verity_authed"):
@@ -24,11 +26,20 @@ if _DASHBOARD_PASSWORD:
                 st.rerun()
             st.error("Incorrect password")
         st.stop()
-else:
+elif os.getenv("VERITY_DASHBOARD_ALLOW_UNAUTHENTICATED",
+               "").lower() == "true":
     st.warning(
-        "VERITY_DASHBOARD_PASSWORD is not set: anyone who can reach this "
-        "dashboard can read every trace, including raw prompts. Set it "
-        "before deploying the dashboard anywhere.")
+        "VERITY_DASHBOARD_PASSWORD is not set and unauthenticated use "
+        "was explicitly allowed (VERITY_DASHBOARD_ALLOW_UNAUTHENTICATED)"
+        ": anyone who can reach this dashboard can read every trace, "
+        "including raw prompts. Local use only — never deploy this way.")
+else:
+    st.error(
+        "VERITY_DASHBOARD_PASSWORD is not set, so this dashboard is "
+        "refusing to display traces. Set a password before using it, or "
+        "set VERITY_DASHBOARD_ALLOW_UNAUTHENTICATED=true for local-only "
+        "use.")
+    st.stop()
 
 st.title("Verity — AI firewall dashboard")
 

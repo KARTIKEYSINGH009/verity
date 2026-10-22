@@ -604,6 +604,36 @@ def consume_auth_token(token_id) -> None:
           (time.time(), token_id))
 
 
+def claim_auth_token(token_id) -> bool:
+    """Atomically consume a one-time token (audit batch 2, finding 5).
+
+    A single conditional UPDATE marks the token used only if it is
+    still unused and unexpired, so two concurrent requests presenting
+    the same token cannot both succeed — exactly one caller wins.
+    Returns True for the winner, False for everyone else. (The older
+    check-then-consume pair left a race window between the SELECT in
+    the gateway's _token_row and the unconditional UPDATE.)"""
+    _ensure_auth_schema()
+    now = time.time()
+    if _use_postgres():
+        _pg_init()
+        with _pg_connect() as conn:
+            cur = conn.execute(
+                "UPDATE auth_tokens SET used_ts = %s WHERE id = %s"
+                " AND used_ts IS NULL AND expires_ts > %s",
+                (now, token_id, now))
+            return cur.rowcount == 1
+    conn = _connect()
+    cur = conn.execute(
+        "UPDATE auth_tokens SET used_ts = ? WHERE id = ?"
+        " AND used_ts IS NULL AND expires_ts > ?",
+        (now, token_id, now))
+    conn.commit()
+    claimed = cur.rowcount == 1
+    conn.close()
+    return claimed
+
+
 # --- Email marketing: opt-in state, unsubscribe tokens, send log ---------
 
 def _exec(sqlite_sql, pg_sql, params) -> None:

@@ -25,7 +25,7 @@ from .judge import judge_faithfulness
 from .policy import check_request as policy_check_request
 from .policy import check_response as policy_check_response
 from .scoring import faithfulness_score
-from .store import (DuplicateEmail, active_api_key, consume_auth_token,
+from .store import (DuplicateEmail, active_api_key, claim_auth_token,
                     create_session, create_user, delete_session,
                     delete_user_sessions, find_api_key, get_auth_token,
                     get_email_verified, get_marketing_state,
@@ -122,6 +122,28 @@ async def _security_headers(request: Request, call_next):
     return response
 
 
+@app.middleware("http")
+async def _body_size_limit(request: Request, call_next):
+    """Reject oversized bodies before any JSON parsing happens
+    (audit batch 2, finding 4). The per-field character caps run after
+    parsing; without this, a multi-MB document costs full parse
+    memory/CPU on a public endpoint."""
+    if request.method in ("POST", "PUT", "PATCH"):
+        cap = config.MAX_BODY_BYTES
+
+        def _too_large():
+            return JSONResponse(status_code=413, content={"detail": {
+                "error": "request_too_large", "limit_bytes": cap}})
+
+        content_length = request.headers.get("content-length")
+        if content_length and content_length.isdigit() \
+                and int(content_length) > cap:
+            return _too_large()
+        if len(await request.body()) > cap:
+            return _too_large()
+    return await call_next(request)
+
+
 class Message(BaseModel):
     role: str
     content: str
@@ -129,7 +151,8 @@ class Message(BaseModel):
 
 class ChatRequest(BaseModel):
     model: str = "gpt-4o-mini"
-    messages: list[Message] = Field(min_length=1)
+    messages: list[Message] = Field(min_length=1,
+                                    max_length=config.MAX_MESSAGES)
     # Optional: reference text the answer must stay grounded in.
     grounding_context: str = ""
     # Optional: business policy the interaction must obey (milestone 4).
@@ -215,13 +238,26 @@ def _client_key(request: Request) -> str:
     """Rate-limit bucket key. Behind a proxy (Vercel), request.client is
     the proxy itself — every visitor would share one bucket — so prefer
     the first X-Forwarded-For hop, which the platform sets to the real
-    client address."""
+    client address. Residual risk (audit batch 2, finding 1): a client
+    supplied XFF is only as trustworthy as the platform's normalization
+    of it, so IP buckets are now backed up by per-API-key and per-email
+    buckets that IP rotation cannot reset. A shared cross-instance
+    limiter remains a tracked infrastructure follow-up."""
     xff = request.headers.get("x-forwarded-for", "")
     if xff:
         first = xff.split(",")[0].strip()
         if first:
             return first
     return request.client.host if request.client else "unknown"
+
+
+def _rate_limit_email(email: str) -> None:
+    """Per-account auth bucket (audit batch 2, finding 1): credential
+    stuffing and reset spam stay limited per target account even when
+    the attacker rotates source IPs / X-Forwarded-For values."""
+    if email and _rate_limited("auth-email:" + email):
+        raise HTTPException(status_code=429,
+                            detail={"error": "rate_limited"})
 
 
 def _rate_limited(client: str) -> bool:
@@ -438,9 +474,24 @@ def _is_disposable(email: str) -> bool:
     return email.rsplit("@", 1)[-1] in _DISPOSABLE_DOMAINS
 
 
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "testserver"}
+
+
 def _site_base(request: Request) -> str:
-    return (config.PUBLIC_BASE_URL
-            or str(request.base_url)).rstrip("/")
+    """Base URL for security-sensitive email links (verify / reset).
+
+    Audit batch 2, finding 2 (host-header poisoning): a link that can
+    reset a password must only ever point at the configured canonical
+    origin (VERITY_PUBLIC_BASE_URL) — never at a host taken from the
+    request, which a proxy/host mismatch could make attacker-chosen.
+    Local development hosts may use the request base; anything else
+    without a configured canonical base gets no link at all (the send
+    is skipped and reported as not delivered)."""
+    if config.PUBLIC_BASE_URL:
+        return config.PUBLIC_BASE_URL.rstrip("/")
+    if (request.url.hostname or "").lower() in _LOCAL_HOSTS:
+        return str(request.base_url).rstrip("/")
+    return ""
 
 
 def _issue_token(user_id: int, purpose: str, ttl: int) -> str:
@@ -451,9 +502,11 @@ def _issue_token(user_id: int, purpose: str, ttl: int) -> str:
 
 
 def _send_verification(request: Request, user) -> bool:
+    base = _site_base(request)
+    if not base:
+        return False
     token = _issue_token(user["id"], "verify_email", _VERIFY_TTL)
-    subject, text = mailer.verification_email(_site_base(request),
-                                              token)
+    subject, text = mailer.verification_email(base, token)
     return mailer.send_email(user["email"], subject, text)
 
 
@@ -503,6 +556,7 @@ async def auth_signup(request: Request):
         raise HTTPException(status_code=400, detail={
             "error": "validation_failed", "fields": ["email"]})
     email = body["email"].strip().lower()
+    _rate_limit_email(email)
     password = body.get("password", "")
     _company = body.get("company", "")
     company = _company.strip()[:120] if isinstance(_company, str) else ""
@@ -552,6 +606,7 @@ async def auth_login(request: Request):
             "error": "validation_failed",
             "fields": ["email", "password"]})
     email = body["email"].strip().lower()
+    _rate_limit_email(email)
     password = body["password"]
     user = get_user_by_email(email)
     # Product decision (Kartikey, 2026-10-22): the auth flow tells the
@@ -699,7 +754,9 @@ async def auth_verify_email(request: Request):
     if not row:
         raise HTTPException(status_code=400, detail={
             "error": "invalid_or_expired_token"})
-    consume_auth_token(row["id"])
+    if not claim_auth_token(row["id"]):
+        raise HTTPException(status_code=400, detail={
+            "error": "invalid_or_expired_token"})
     set_email_verified(row["user_id"])
     return {"status": "verified"}
 
@@ -732,13 +789,15 @@ async def auth_forgot_password(request: Request):
                             detail={"error": "rate_limited"})
     body = await _json_body(request)
     email = str(body.get("email", "")).strip().lower()
+    _rate_limit_email(email)
     delivery = False
     user = get_user_by_email(email) if _EMAIL_RE.match(email) else None
     # Only password accounts can reset; Google accounts are told to
     # use Google on the sign-in page instead.
-    if user and str(user["pw_hash"]).startswith("pbkdf2$"):
+    base = _site_base(request)
+    if user and base and str(user["pw_hash"]).startswith("pbkdf2$"):
         token = _issue_token(user["id"], "password_reset", _RESET_TTL)
-        subject, text = mailer.reset_email(_site_base(request), token)
+        subject, text = mailer.reset_email(base, token)
         delivery = mailer.send_email(email, subject, text)
     return {"status": "ok", "email_delivery": delivery}
 
@@ -757,7 +816,9 @@ async def auth_reset_password(request: Request):
     if not row:
         raise HTTPException(status_code=400, detail={
             "error": "invalid_or_expired_token"})
-    consume_auth_token(row["id"])
+    if not claim_auth_token(row["id"]):
+        raise HTTPException(status_code=400, detail={
+            "error": "invalid_or_expired_token"})
     update_user_password(row["user_id"], _hash_password(password))
     # Holding the reset link proves control of the mailbox.
     set_email_verified(row["user_id"])
@@ -897,6 +958,12 @@ async def chat_completions(req: ChatRequest, request: Request,
     client = _client_key(request)
     if _rate_limited(client):
         raise HTTPException(status_code=429, detail={"error": "rate_limited"})
+    if authorization and authorization.startswith("Bearer "):
+        _tok = authorization.removeprefix("Bearer ").strip()
+        if _tok and _rate_limited(
+                "key:" + hashlib.sha256(_tok.encode()).hexdigest()[:16]):
+            raise HTTPException(status_code=429,
+                                detail={"error": "rate_limited"})
     _enforce_free_quota(authorization)
     _enforce_email_verified(authorization)
     combined = "\n".join(m.content for m in req.messages)

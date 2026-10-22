@@ -38,6 +38,10 @@ JUDGE_ENABLED = os.getenv("VERITY_JUDGE_ENABLED", "true").lower() == "true"
 ADMIN_KEY = os.getenv("VERITY_ADMIN_KEY", "")
 # Abuse controls for the public chat endpoint.
 MAX_INPUT_CHARS = _int_env("VERITY_MAX_INPUT_CHARS", 20000)
+# Hard byte cap on any request body, enforced by middleware before JSON
+# parsing (audit batch 2, finding 4); and a cap on message count.
+MAX_BODY_BYTES = _int_env("VERITY_MAX_BODY_BYTES", 1_048_576)
+MAX_MESSAGES = _int_env("VERITY_MAX_MESSAGES", 100)
 RATE_LIMIT_PER_MIN = _int_env("VERITY_RATE_LIMIT_PER_MIN", 120)
 # Interactive API docs (/docs, /redoc, /openapi.json) are off by default:
 # a public gateway should not publish a map of its own API surface.
