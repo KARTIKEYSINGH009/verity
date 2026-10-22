@@ -81,7 +81,7 @@
 
         <div class="stats">
       <div class="wrap stats-grid" aria-label="Project status">
-        <div class="stat"><div class="stat-top"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C15.5 3.8 18 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span><strong>88.0%</strong></div><span>Attack recall (combined detector)</span></div><div class="stat"><div class="stat-top"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></span><strong>91.7%</strong></div><span>Precision</span></div><div class="stat"><div class="stat-top"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M8 16v-5M13 16V8M18 16v-8"/></svg></span><strong>10.0%</strong></div><span>False positive rate</span></div><div class="stat"><div class="stat-top"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg></span><strong>0.97 ms</strong></div><span>Average screening latency (local)</span></div><div class="stat"><div class="stat-top"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg></span><strong>151 / 151</strong></div><span>Tests passing (unit + integration)</span></div>
+        <div class="stat"><div class="stat-top"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C15.5 3.8 18 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span><strong id="stat-recall">88.0%</strong></div><span>Attack recall (combined detector)</span></div><div class="stat"><div class="stat-top"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></span><strong id="stat-precision">91.7%</strong></div><span>Precision</span></div><div class="stat"><div class="stat-top"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M8 16v-5M13 16V8M18 16v-8"/></svg></span><strong id="stat-fpr">10.0%</strong></div><span>False positive rate</span></div><div class="stat"><div class="stat-top"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg></span><strong id="stat-latency">0.27 ms</strong></div><span>Median screening latency (local benchmark)</span></div><div class="stat"><div class="stat-top"><span class="stat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg></span><strong>169 / 169</strong></div><span>Tests passing (unit + integration)</span></div>
       </div>
     </div>
     </div>
@@ -109,18 +109,18 @@
       <div class="wrap">
         <div class="section-head">
           <h2>Measured, not promised.</h2>
-          <p>Held-out benchmark: 45 prompts the model never trained on — 25 fresh attacks in new phrasings (including multilingual and spacing-obfuscated), 20 deliberately hard benign near-misses. Threshold checked on a separate 16-prompt validation set. Reproduce it from the repository with <code>python scripts/run_benchmarks.py</code>; full data in <a href="/benchmarks.json">benchmarks.json</a>.</p>
+          <p>Held-out benchmark: 45 prompts the model never trained on — 25 fresh attacks in new phrasings (including multilingual and spacing-obfuscated), 20 deliberately hard benign near-misses. Threshold checked on a separate 16-prompt validation set. Reproduce it from the repository with <code>python scripts/run_benchmarks.py</code>; full data in <a href="/benchmarks.json">benchmarks.json</a>. These are internal measurements on a small set — a signal, not an independent security certification. <span id="bench-date"></span></p>
         </div>
         <div class="meters">
-          <div class="meter-card"><strong>88.0%</strong><div class="m-label">Attack recall</div><div class="bar"><i style="width:88%"></i></div><div class="m-sub">22 / 25 attacks detected</div></div>
-          <div class="meter-card"><strong>91.7%</strong><div class="m-label">Precision</div><div class="bar"><i style="width:91.7%"></i></div><div class="m-sub">22 / 24 flagged were attacks</div></div>
-          <div class="meter-card"><strong>10.0%</strong><div class="m-label">False positive rate</div><div class="bar"><i style="width:10%"></i></div><div class="m-sub">2 / 20 benign flagged</div></div>
-          <div class="meter-card"><strong>89.8%</strong><div class="m-label">F1 score</div><div class="bar"><i style="width:89.8%"></i></div><div class="m-sub">Combined guard, held-out set</div></div>
+          <div class="meter-card"><strong id="meter-recall">88.0%</strong><div class="m-label">Attack recall</div><div class="bar"><i id="meter-recall-bar" style="width:88%"></i></div><div class="m-sub" id="meter-recall-sub">22 / 25 attacks detected</div></div>
+          <div class="meter-card"><strong id="meter-precision">91.7%</strong><div class="m-label">Precision</div><div class="bar"><i id="meter-precision-bar" style="width:91.7%"></i></div><div class="m-sub" id="meter-precision-sub">22 / 24 flagged were attacks</div></div>
+          <div class="meter-card"><strong id="meter-fpr">10.0%</strong><div class="m-label">False positive rate</div><div class="bar"><i id="meter-fpr-bar" style="width:10%"></i></div><div class="m-sub" id="meter-fpr-sub">2 / 20 benign flagged</div></div>
+          <div class="meter-card"><strong id="meter-f1">89.8%</strong><div class="m-label">F1 score</div><div class="bar"><i id="meter-f1-bar" style="width:89.8%"></i></div><div class="m-sub">Combined guard, held-out set</div></div>
         </div>
         <div class="bench-grid">
           <div>
-            <div class="bench-note"><b>Rules alone: 0% recall</b><p>Heuristics only catch attacks phrased like known patterns. On novel wording they are a safety net, not a shield — which is why the learned layer exists.</p></div>
-            <div class="bench-note"><b>Classifier alone: 84% recall</b><p>The trained model generalizes to new phrasings. Per-category recall on this run — social engineering, impersonation, data theft, multilingual, spacing: 100%. Weakest classes: harmful content (50%) and fraud (67%).</p></div>
+            <div class="bench-note"><b>Rules alone: 4% recall</b><p>Heuristic patterns caught 1 of the 25 held-out attacks — they only fire on attacks phrased like known patterns. On novel wording they are a safety net, not a shield — which is why the learned layer exists.</p></div>
+            <div class="bench-note"><b>Classifier alone: 84% recall</b><p>The trained model generalizes to new phrasings. Per-category recall on this run — injection, impersonation, data theft, multilingual, spacing: 100%; social engineering: 80%. Weakest classes: harmful content (50%) and fraud (67%).</p></div>
             <div class="bench-note"><b>Known limitations</b><p>The training set is a prototype baseline (200 examples) and grows through the corrections loop. False-positive rate is 10% on deliberately hard benign prompts. The faithfulness heuristic (the judge’s offline fallback) scores 75% verdict accuracy on an 8-case mini-eval in benchmarks.json (unsupported-answer precision 1.0, recall 0.5); the LLM judge is primary in live mode. No filter can guarantee complete protection — Verity reduces risk and records evidence; it does not eliminate either.</p></div>
           </div>
           <aside class="cats">
@@ -216,7 +216,7 @@
 }
 
 <span class="cmt">// HTTP 400 — the model never saw the prompt.
-// Average screening latency: 0.97 ms (local benchmark).</span></div>
+// Screening latency: sub-millisecond median in the local benchmark (benchmarks.json).</span></div>
           </div>
         </div>
       </div>
@@ -287,7 +287,7 @@ client = OpenAI(
         </div>
         <div class="layers">
           <div class="layer"><b>Open source (MIT)</b><p>Full source, training data, and benchmark scripts are public under the MIT license: <a href="https://github.com/KARTIKEYSINGH009/verity">github.com/KARTIKEYSINGH009/verity</a>. Found a bypass? That is a contribution — new attacks enter the reviewed corrections loop and make the next model stronger.</p></div>
-          <div class="layer"><b>Data handling</b><p>Your deployment stores its own traces (inputs, outputs, flags, latency) in its own database — you set retention. In live mode, answer text is sent to your chosen judge model under your provider key. This public demo runs in mock mode; its traces live in ephemeral storage and reset on redeploy — and the traces endpoint is disabled here, because traces contain raw prompts. Found a vulnerability? Please report it through GitHub Security Advisories on the repository instead of opening a public issue.</p></div>
+          <div class="layer"><b>Data handling</b><p>Three contexts, three distinct answers. Your own deployment (pilot or self-hosted): traces (inputs, outputs, flags, latency) live in your database under your retention — 30 days by default; in live mode, answer text is sent to your chosen judge model under your provider key. A free account on this site: traces made with your API key are stored in this site's database and are visible only to you, in your dashboard. The public playground (no account): requests run against a mock model and are logged to the same database, pruned after 30 days like all traces — but they are attached to no account, appear in no dashboard, and the admin traces endpoint is disabled on this deployment, because traces contain raw prompts. Found a vulnerability? Please report it through GitHub Security Advisories on the repository instead of opening a public issue.</p></div>
           <div class="layer"><b>Screening is not authorization</b><p>Verity classifies content and enforces declared policy on requests and answers. It is not an authorization system: sensitive actions (refunds, transfers, record changes) must also be permission-checked at your tool and backend boundary. Never let a model answer alone authorize one.</p></div>
         </div>
       </div>
@@ -326,7 +326,7 @@ client = OpenAI(
         </div>
         <details><summary>What is included in the free plan?</summary><p>A personal account on this site: your own API key, a dashboard with your requests and traces, and gateway screening (guard, policy checks, grounding evaluation) against a mock model — so you can integrate and evaluate end-to-end. Free keys are limited to 1,000 requests per month, enforced by the gateway.</p></details>
         <details><summary>Can I use my own model provider?</summary><p>Yes — on a pilot deployment. Verity is OpenAI-compatible and provider-agnostic: during provisioning your deployment is pointed at your provider (OpenAI, Groq, Anthropic-compatible endpoints, self-hosted) with your key, which never passes through any Verity form or chat.</p></details>
-        <details><summary>Do you store my data?</summary><p>Each deployment stores its own traces (prompts, answers, verdicts, latency) in its own database, retained for 30 days and pruned on an ongoing basis. Your data is never used for training. On this public site, free-tier traces live in the site's database and are visible only to you, in your dashboard.</p></details>
+        <details><summary>Do you store my data?</summary><p>It depends on the context, so here is each one. Free account on this site: traces from your API key are stored in the site's database (hosted in Singapore), visible only to you in your dashboard, pruned after 30 days, and never used for training. Public playground (no account): requests are logged and pruned the same way, but attached to no account and shown to no one — the admin traces endpoint is disabled on this deployment. Your own deployment (pilot or self-hosted): traces live in your database, under your retention settings and your control, and never pass through this site.</p></details>
         <details><summary>What are the current limitations?</summary><p>Streaming responses are not passed through yet. The free tier runs a mock model. Self-serve live deployments (Pro) are in development — today, live traffic means a founder-led pilot. Verity also is not an authorization system: permission-check sensitive actions in your own backend.</p></details>
         <details><summary>Can I get a dedicated deployment?</summary><p>Yes — that is exactly what a <a href="/pilot">pilot</a> is: your own deployment, keys and database, isolated by architecture, with weekly founder reports and success criteria agreed in writing.</p></details>
       </div>
@@ -428,5 +428,28 @@ client = OpenAI(
     })();
   </script>
   <script src="/site.js" defer></script>
+  <script>
+    (function () {
+      function set(id, text) { var el = document.getElementById(id); if (el) el.textContent = text; }
+      function pct(x, dp) { return (x * 100).toFixed(dp) + '%'; }
+      fetch('/benchmarks.json').then(function (r) { return r.json(); }).then(function (b) {
+        var c = b.modes.combined, m = b.meta, d = b.dataset;
+        set('stat-recall', pct(c.recall, 1)); set('stat-precision', pct(c.precision, 1));
+        set('stat-fpr', pct(c.false_positive_rate, 1));
+        set('stat-latency', m.latency_ms.p50.toFixed(2) + ' ms');
+        set('meter-recall', pct(c.recall, 1)); set('meter-precision', pct(c.precision, 1));
+        set('meter-fpr', pct(c.false_positive_rate, 1)); set('meter-f1', pct(c.f1, 1));
+        set('meter-recall-sub', c.tp + ' / ' + d.malicious + ' attacks detected');
+        set('meter-precision-sub', c.tp + ' / ' + (c.tp + c.fp) + ' flagged were attacks');
+        set('meter-fpr-sub', c.fp + ' / ' + d.benign + ' benign flagged');
+        var rb = document.getElementById('meter-recall-bar'); if (rb) rb.style.width = (c.recall * 100) + '%';
+        var pb = document.getElementById('meter-precision-bar'); if (pb) pb.style.width = (c.precision * 100) + '%';
+        var fb = document.getElementById('meter-fpr-bar'); if (fb) fb.style.width = (c.false_positive_rate * 100) + '%';
+        var f1b = document.getElementById('meter-f1-bar'); if (f1b) f1b.style.width = (c.f1 * 100) + '%';
+        var bd = document.getElementById('bench-date');
+        if (bd && m.generated_at) bd.textContent = 'Last measured ' + m.generated_at.slice(0, 10) + '.';
+      }).catch(function () { /* static fallbacks stay */ });
+    })();
+  </script>
 </body>
 </html>

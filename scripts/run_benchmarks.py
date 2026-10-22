@@ -157,18 +157,13 @@ if __name__ == "__main__":
         sweep[str(thr)] = {"recall": m["recall"],
                            "false_positive_rate": m["false_positive_rate"]}
 
-    import subprocess
     from datetime import datetime, timezone
-    try:
-        commit = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            capture_output=True, text=True,
-            cwd=os.path.join(os.path.dirname(__file__), "..")).stdout.strip()
-    except Exception:
-        commit = "unknown"
+    # The published file deliberately carries no commit stamp and no
+    # threshold sweep: the stamp goes stale the moment anything else
+    # ships, and the sweep is a tuning artifact from the validation
+    # set, not a result. Only measured outcomes are published.
     lat_sorted = sorted(latencies)
     meta = {
-        "commit": commit,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "classifier": "naive-bayes word(1,2)+char(3,4) n-grams, normalized input",
         "threshold": CLASSIFIER_THRESHOLD,
@@ -179,7 +174,6 @@ if __name__ == "__main__":
                        "p95": _pct(lat_sorted, 0.95),
                        "p99": _pct(lat_sorted, 0.99),
                        "mean": round(sum(latencies) / len(latencies), 2)},
-        "threshold_sweep_on_validation": sweep,
     }
 
     results = {
