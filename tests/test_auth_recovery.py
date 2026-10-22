@@ -212,3 +212,17 @@ def test_recovery_pages_served(client):
         r = client.get(path)
         assert r.status_code == 200, path
         assert "Verity" in r.text
+
+
+def test_signup_rejects_nonstring_email(client):
+    r = client.post("/v1/auth/signup", json={
+        "email": ["a@b.co"], "password": "whatever 123"})
+    assert r.status_code == 400
+    assert r.json()["detail"]["fields"] == ["email"]
+
+
+def test_login_rejects_null_credentials(client):
+    r = client.post("/v1/auth/login", json={
+        "email": None, "password": None})
+    assert r.status_code == 400
+    assert r.json()["detail"]["error"] == "validation_failed"
