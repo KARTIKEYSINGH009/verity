@@ -106,7 +106,21 @@ def _sqlite_init_once() -> None:
             pw_hash TEXT NOT NULL,
             company TEXT NOT NULL DEFAULT '',
             plan TEXT NOT NULL DEFAULT 'free',
+            email_verified INTEGER NOT NULL DEFAULT 1,
             created_ts REAL NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS auth_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            purpose TEXT NOT NULL,
+            token_hash TEXT NOT NULL UNIQUE,
+            created_ts REAL NOT NULL,
+            expires_ts REAL NOT NULL,
+            used_ts REAL
         )
         """
     )
@@ -208,7 +222,17 @@ CREATE TABLE IF NOT EXISTS users (
     pw_hash TEXT NOT NULL,
     company TEXT NOT NULL DEFAULT '',
     plan TEXT NOT NULL DEFAULT 'free',
+    email_verified INTEGER NOT NULL DEFAULT 1,
     created_ts DOUBLE PRECISION NOT NULL
+);
+CREATE TABLE IF NOT EXISTS auth_tokens (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    purpose TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    created_ts DOUBLE PRECISION NOT NULL,
+    expires_ts DOUBLE PRECISION NOT NULL,
+    used_ts DOUBLE PRECISION
 );
 CREATE TABLE IF NOT EXISTS sessions (
     token_hash TEXT PRIMARY KEY,
@@ -400,14 +424,17 @@ def _rows(sqlite_sql, pg_sql, params=(), fetch="all"):
     return result
 
 
-def create_user(email, pw_hash, company="") -> int:
+def create_user(email, pw_hash, company="", email_verified=True) -> int:
+    _ensure_auth_schema()
     try:
         return _rows(
-            "INSERT INTO users (email, pw_hash, company, created_ts)"
-            " VALUES (?, ?, ?, ?)",
-            "INSERT INTO users (email, pw_hash, company, created_ts)"
-            " VALUES (%s, %s, %s, %s) RETURNING id",
-            (email, pw_hash, company, time.time()), fetch="none")
+            "INSERT INTO users (email, pw_hash, company,"
+            " email_verified, created_ts) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO users (email, pw_hash, company,"
+            " email_verified, created_ts)"
+            " VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            (email, pw_hash, company, 1 if email_verified else 0,
+             time.time()), fetch="none")
     except Exception as exc:  # unique violation, either backend
         if "unique" in str(exc).lower() or "duplicate" in str(exc).lower():
             raise DuplicateEmail(email) from exc
@@ -453,6 +480,109 @@ def delete_session(token_hash) -> None:
     _rows("DELETE FROM sessions WHERE token_hash = ?",
           "DELETE FROM sessions WHERE token_hash = %s",
           (token_hash,), fetch="none")
+
+
+# --- Auth security: email verification + one-time tokens ----------------
+
+def _ensure_auth_schema() -> None:
+    """Adds email_verified (existing accounts grandfathered as
+    verified) and the auth_tokens table to databases created before
+    this feature existed. Idempotent; runs per call like the
+    marketing-columns migration (a once-per-process flag breaks when
+    the database file changes under the process)."""
+    if _use_postgres():
+        _exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS"
+              " email_verified INTEGER NOT NULL DEFAULT 1",
+              "ALTER TABLE users ADD COLUMN IF NOT EXISTS"
+              " email_verified INTEGER NOT NULL DEFAULT 1", ())
+        _exec("CREATE TABLE IF NOT EXISTS auth_tokens ("
+              " id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL,"
+              " purpose TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE,"
+              " created_ts DOUBLE PRECISION NOT NULL,"
+              " expires_ts DOUBLE PRECISION NOT NULL,"
+              " used_ts DOUBLE PRECISION)",
+              "CREATE TABLE IF NOT EXISTS auth_tokens ("
+              " id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL,"
+              " purpose TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE,"
+              " created_ts DOUBLE PRECISION NOT NULL,"
+              " expires_ts DOUBLE PRECISION NOT NULL,"
+              " used_ts DOUBLE PRECISION)", ())
+    else:
+        cols = [r["name"] for r in _rows(
+            "SELECT name FROM pragma_table_info('users')",
+            "SELECT name FROM pragma_table_info('users')", ())]
+        if "email_verified" not in cols:
+            _exec("ALTER TABLE users ADD COLUMN email_verified"
+                  " INTEGER NOT NULL DEFAULT 1",
+                  "ALTER TABLE users ADD COLUMN email_verified"
+                  " INTEGER NOT NULL DEFAULT 1", ())
+        _exec("CREATE TABLE IF NOT EXISTS auth_tokens ("
+              " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+              " user_id INTEGER NOT NULL, purpose TEXT NOT NULL,"
+              " token_hash TEXT NOT NULL UNIQUE,"
+              " created_ts REAL NOT NULL, expires_ts REAL NOT NULL,"
+              " used_ts REAL)",
+              "CREATE TABLE IF NOT EXISTS auth_tokens ("
+              " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+              " user_id INTEGER NOT NULL, purpose TEXT NOT NULL,"
+              " token_hash TEXT NOT NULL UNIQUE,"
+              " created_ts REAL NOT NULL, expires_ts REAL NOT NULL,"
+              " used_ts REAL)", ())
+
+
+def get_email_verified(user_id) -> bool:
+    _ensure_auth_schema()
+    row = _rows("SELECT email_verified FROM users WHERE id = ?",
+                "SELECT email_verified FROM users WHERE id = %s",
+                (user_id,), fetch="one")
+    return bool(row and row["email_verified"])
+
+
+def set_email_verified(user_id) -> None:
+    _ensure_auth_schema()
+    _exec("UPDATE users SET email_verified = 1 WHERE id = ?",
+          "UPDATE users SET email_verified = 1 WHERE id = %s",
+          (user_id,))
+
+
+def update_user_password(user_id, pw_hash) -> None:
+    _exec("UPDATE users SET pw_hash = ? WHERE id = ?",
+          "UPDATE users SET pw_hash = %s WHERE id = %s",
+          (pw_hash, user_id))
+
+
+def delete_user_sessions(user_id) -> None:
+    _rows("DELETE FROM sessions WHERE user_id = ?",
+          "DELETE FROM sessions WHERE user_id = %s",
+          (user_id,), fetch="none")
+
+
+def issue_auth_token(user_id, purpose, token_hash, expires_ts) -> None:
+    """One live token per user+purpose: issuing replaces the old one."""
+    _ensure_auth_schema()
+    _exec("DELETE FROM auth_tokens WHERE user_id = ? AND purpose = ?",
+          "DELETE FROM auth_tokens WHERE user_id = %s"
+          " AND purpose = %s", (user_id, purpose))
+    _exec("INSERT INTO auth_tokens (user_id, purpose, token_hash,"
+          " created_ts, expires_ts) VALUES (?, ?, ?, ?, ?)",
+          "INSERT INTO auth_tokens (user_id, purpose, token_hash,"
+          " created_ts, expires_ts) VALUES (%s, %s, %s, %s, %s)",
+          (user_id, purpose, token_hash, time.time(), expires_ts))
+
+
+def get_auth_token(token_hash, purpose):
+    _ensure_auth_schema()
+    return _rows("SELECT * FROM auth_tokens WHERE token_hash = ?"
+                 " AND purpose = ?",
+                 "SELECT * FROM auth_tokens WHERE token_hash = %s"
+                 " AND purpose = %s",
+                 (token_hash, purpose), fetch="one")
+
+
+def consume_auth_token(token_id) -> None:
+    _exec("UPDATE auth_tokens SET used_ts = ? WHERE id = ?",
+          "UPDATE auth_tokens SET used_ts = %s WHERE id = %s",
+          (time.time(), token_id))
 
 
 # --- Email marketing: opt-in state, unsubscribe tokens, send log ---------

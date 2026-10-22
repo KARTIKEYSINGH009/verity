@@ -60,6 +60,24 @@ OAUTH_REDIRECT_BASE = os.getenv("VERITY_OAUTH_REDIRECT_BASE", "")
 # Free-plan monthly request quota for portal-issued keys, enforced by
 # the gateway (counted from the key's own traces). 0 disables it.
 FREE_MONTHLY_QUOTA = _int_env("VERITY_FREE_MONTHLY_QUOTA", 1000)
+# Transactional email (verification + password reset). A sender is
+# configured when EITHER Resend (RESEND_API_KEY + EMAIL_FROM) or SMTP
+# (SMTP_HOST + SMTP_USER + SMTP_PASSWORD + EMAIL_FROM) is present.
+# Email verification becomes REQUIRED automatically once a sender
+# exists (until then new accounts are created verified, so nobody is
+# locked out by an email that can never arrive); force it either way
+# with VERITY_EMAIL_VERIFICATION_REQUIRED=true/false.
+EMAIL_FROM = os.getenv("EMAIL_FROM", "")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = _int_env("SMTP_PORT", 587)
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+EMAIL_VERIFICATION_REQUIRED = os.getenv(
+    "VERITY_EMAIL_VERIFICATION_REQUIRED", "")
+# Public base for links inside emails; falls back to the request's
+# own origin when empty.
+PUBLIC_BASE_URL = os.getenv("VERITY_PUBLIC_BASE_URL", "")
 # Client API keys for /v1/chat/completions (audit F2). Clients present
 # their key as "Authorization: Bearer <key>" — the OpenAI client does
 # this automatically when its api_key is set to the Verity key. Give

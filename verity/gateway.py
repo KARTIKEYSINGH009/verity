@@ -18,19 +18,22 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from . import config
+from . import config, mailer
 from .guard import screen
 from .judge import judge_faithfulness
 from .policy import check_request as policy_check_request
 from .policy import check_response as policy_check_response
 from .scoring import faithfulness_score
-from .store import (DuplicateEmail, active_api_key, create_session,
-                    create_user, delete_session, find_api_key,
-                    get_marketing_state, get_user_by_email,
-                    get_user_by_id, get_user_by_session,
-                    get_user_by_unsubscribe_token, init_db, issue_api_key,
+from .store import (DuplicateEmail, active_api_key, consume_auth_token,
+                    create_session, create_user, delete_session,
+                    delete_user_sessions, find_api_key, get_auth_token,
+                    get_email_verified, get_marketing_state,
+                    get_user_by_email, get_user_by_id,
+                    get_user_by_session, get_user_by_unsubscribe_token,
+                    init_db, issue_api_key, issue_auth_token,
                     log_pilot_request, log_trace, recent_pilot_requests,
-                    recent_traces, revoke_api_keys, set_marketing_opt_in,
+                    recent_traces, revoke_api_keys, set_email_verified,
+                    set_marketing_opt_in, update_user_password,
                     usage_for_client)
 
 
@@ -386,6 +389,78 @@ async def _json_body(request: Request) -> dict:
     return body
 
 
+_VERIFY_TTL = 24 * 3600
+_RESET_TTL = 3600
+
+# Widely abused throwaway inboxes; verification stays the real gate,
+# this just keeps the most obvious junk out of the account list.
+_DISPOSABLE_DOMAINS = frozenset({
+    "10minutemail.com", "bccto.cc", "chogmail.com", "discard.email",
+    "discardmail.com", "dispostable.com", "emailondeck.com",
+    "fakeinbox.com", "getnada.com", "guerrillamail.com",
+    "guerrillamailblock.com", "mailcatch.com", "maildrop.cc",
+    "mailinator.com", "mailinator.net", "mailinator2.com",
+    "mailnesia.com", "mintemail.com", "mohmal.com", "mytemp.email",
+    "notmailinator.com", "pokemail.net", "sharklasers.com",
+    "spam4.me", "temp-mail.org", "tempinbox.com", "tempmail.com",
+    "thisisnotmyrealemail.com", "throwawaymail.com", "trashmail.com",
+    "veryrealemail.com", "viditag.com", "yopmail.com"})
+
+
+def _is_disposable(email: str) -> bool:
+    return email.rsplit("@", 1)[-1] in _DISPOSABLE_DOMAINS
+
+
+def _site_base(request: Request) -> str:
+    return (config.PUBLIC_BASE_URL
+            or str(request.base_url)).rstrip("/")
+
+
+def _issue_token(user_id: int, purpose: str, ttl: int) -> str:
+    token = secrets.token_urlsafe(32)
+    digest = hashlib.sha256(token.encode()).hexdigest()
+    issue_auth_token(user_id, purpose, digest, time.time() + ttl)
+    return token
+
+
+def _send_verification(request: Request, user) -> bool:
+    token = _issue_token(user["id"], "verify_email", _VERIFY_TTL)
+    subject, text = mailer.verification_email(_site_base(request),
+                                              token)
+    return mailer.send_email(user["email"], subject, text)
+
+
+def _token_row(token: str, purpose: str):
+    """A usable token row, or None (unknown, used, or expired)."""
+    if not token:
+        return None
+    digest = hashlib.sha256(token.encode()).hexdigest()
+    row = get_auth_token(digest, purpose)
+    if not row or row["used_ts"] is not None:
+        return None
+    if row["expires_ts"] < time.time():
+        return None
+    return row
+
+
+def _enforce_email_verified(authorization: str | None) -> None:
+    """Portal keys stay inactive until the account email is
+    verified. Env/operator keys are exempt."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return
+    token = authorization[len("Bearer "):]
+    if not token:
+        return
+    digest = hashlib.sha256(token.encode()).hexdigest()
+    key_row = find_api_key(digest)
+    if key_row and not get_email_verified(key_row["user_id"]):
+        raise HTTPException(
+            status_code=403,
+            detail={"error": "email_not_verified",
+                    "reason": "Verify the account email to activate"
+                              " this API key."})
+
+
 def _public_user(user) -> dict:
     return {"email": user["email"], "company": user["company"],
             "plan": user["plan"]}
@@ -403,11 +478,18 @@ async def auth_signup(request: Request):
     if not _EMAIL_RE.match(email):
         raise HTTPException(status_code=400, detail={
             "error": "validation_failed", "fields": ["email"]})
+    if _is_disposable(email):
+        raise HTTPException(status_code=400, detail={
+            "error": "disposable_email",
+            "reason": "Please sign up with a permanent email"
+                      " address."})
     if not isinstance(password, str) or not 8 <= len(password) <= 200:
         raise HTTPException(status_code=400, detail={
             "error": "validation_failed", "fields": ["password"]})
+    verification_on = mailer.verification_required()
     try:
-        user_id = create_user(email, _hash_password(password), company)
+        user_id = create_user(email, _hash_password(password), company,
+                              email_verified=not verification_on)
     except DuplicateEmail:
         raise HTTPException(status_code=409,
                             detail={"error": "email_taken"})
@@ -415,9 +497,16 @@ async def auth_signup(request: Request):
         set_marketing_opt_in(user_id, True,
                              secrets.token_urlsafe(24))
     api_key = _portal_key(user_id)
+    user_row = get_user_by_id(user_id)
+    delivery = None
+    if verification_on:
+        delivery = _send_verification(request, user_row)
     return _start_session(request,
-                          {"user": _public_user(get_user_by_id(user_id)),
-                           "api_key": api_key}, user_id, status_code=201)
+                          {"user": _public_user(user_row),
+                           "api_key": api_key,
+                           "email_verified": not verification_on,
+                           "email_delivery": delivery},
+                          user_id, status_code=201)
 
 
 @app.post("/v1/auth/login")
@@ -469,6 +558,7 @@ def me(request: Request):
                          "month_total": 0},
                "quota": ({"limit_per_month": config.FREE_MONTHLY_QUOTA}
                          if user["plan"] == "free" else None),
+               "email_verified": get_email_verified(user["id"]),
                "marketing_opt_in": get_marketing_state(
                    user["id"])["opt_in"],
                "traces": []}
@@ -554,6 +644,84 @@ def _enforce_free_quota(authorization: str | None) -> None:
             "error": "quota_exceeded", "plan": "free",
             "limit_per_month": config.FREE_MONTHLY_QUOTA,
             "reason": "free plan monthly request limit reached"})
+
+
+# --- Email verification + password reset ---------------------------------
+
+
+@app.post("/v1/auth/verify-email")
+async def auth_verify_email(request: Request):
+    if _rate_limited("auth:" + _client_key(request)):
+        raise HTTPException(status_code=429,
+                            detail={"error": "rate_limited"})
+    body = await _json_body(request)
+    row = _token_row(str(body.get("token", "")), "verify_email")
+    if not row:
+        raise HTTPException(status_code=400, detail={
+            "error": "invalid_or_expired_token"})
+    consume_auth_token(row["id"])
+    set_email_verified(row["user_id"])
+    return {"status": "verified"}
+
+
+@app.post("/v1/auth/resend-verification")
+async def auth_resend_verification(request: Request):
+    user = _session_user(request)
+    if not user:
+        raise HTTPException(status_code=401,
+                            detail={"error": "auth_required"})
+    if _rate_limited("auth:" + _client_key(request)):
+        raise HTTPException(status_code=429,
+                            detail={"error": "rate_limited"})
+    if get_email_verified(user["id"]):
+        return {"status": "already_verified"}
+    if not mailer.email_configured():
+        raise HTTPException(status_code=503, detail={
+            "error": "email_not_configured"})
+    if not _send_verification(request, user):
+        raise HTTPException(status_code=502,
+                            detail={"error": "send_failed"})
+    return {"status": "sent"}
+
+
+@app.post("/v1/auth/forgot-password")
+async def auth_forgot_password(request: Request):
+    if _rate_limited("auth:" + _client_key(request)):
+        raise HTTPException(status_code=429,
+                            detail={"error": "rate_limited"})
+    body = await _json_body(request)
+    email = str(body.get("email", "")).strip().lower()
+    delivery = False
+    user = get_user_by_email(email) if _EMAIL_RE.match(email) else None
+    # Only password accounts can reset; Google accounts are told to
+    # use Google on the sign-in page instead.
+    if user and str(user["pw_hash"]).startswith("pbkdf2$"):
+        token = _issue_token(user["id"], "password_reset", _RESET_TTL)
+        subject, text = mailer.reset_email(_site_base(request), token)
+        delivery = mailer.send_email(email, subject, text)
+    return {"status": "ok", "email_delivery": delivery}
+
+
+@app.post("/v1/auth/reset-password")
+async def auth_reset_password(request: Request):
+    if _rate_limited("auth:" + _client_key(request)):
+        raise HTTPException(status_code=429,
+                            detail={"error": "rate_limited"})
+    body = await _json_body(request)
+    password = body.get("password")
+    if not isinstance(password, str) or not 8 <= len(password) <= 200:
+        raise HTTPException(status_code=400, detail={
+            "error": "validation_failed", "fields": ["password"]})
+    row = _token_row(str(body.get("token", "")), "password_reset")
+    if not row:
+        raise HTTPException(status_code=400, detail={
+            "error": "invalid_or_expired_token"})
+    consume_auth_token(row["id"])
+    update_user_password(row["user_id"], _hash_password(password))
+    # Holding the reset link proves control of the mailbox.
+    set_email_verified(row["user_id"])
+    delete_user_sessions(row["user_id"])
+    return {"status": "password_reset"}
 
 
 # --- Google sign-in (OAuth 2.0) ----------------------------------------------
@@ -663,6 +831,8 @@ async def google_callback(request: Request, code: str | None = None,
         return fail("google_unverified")
     email = str(info["email"]).strip().lower()
     user = get_user_by_email(email)
+    if user and not get_email_verified(user["id"]):
+        set_email_verified(user["id"])
     if not user:
         user_id = create_user(email, "oauth$google", "")
         user = get_user_by_id(user_id)
@@ -687,6 +857,7 @@ async def chat_completions(req: ChatRequest, request: Request,
     if _rate_limited(client):
         raise HTTPException(status_code=429, detail={"error": "rate_limited"})
     _enforce_free_quota(authorization)
+    _enforce_email_verified(authorization)
     combined = "\n".join(m.content for m in req.messages)
     if len(combined) > config.MAX_INPUT_CHARS:
         raise HTTPException(status_code=413, detail={
@@ -832,6 +1003,21 @@ def signup_page():
 @app.get("/login", include_in_schema=False)
 def login_page():
     return FileResponse(_site_dir / "login.html")
+
+
+@app.get("/forgot-password", include_in_schema=False)
+def forgot_password_page():
+    return FileResponse(_site_dir / "forgot-password.html")
+
+
+@app.get("/reset-password", include_in_schema=False)
+def reset_password_page():
+    return FileResponse(_site_dir / "reset-password.html")
+
+
+@app.get("/verify-email", include_in_schema=False)
+def verify_email_page():
+    return FileResponse(_site_dir / "verify-email.html")
 
 
 @app.get("/unsubscribe", include_in_schema=False)
