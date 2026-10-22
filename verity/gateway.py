@@ -472,9 +472,13 @@ async def auth_signup(request: Request):
         raise HTTPException(status_code=429,
                             detail={"error": "rate_limited"})
     body = await _json_body(request)
-    email = str(body.get("email", "")).strip().lower()
+    if not isinstance(body.get("email"), str):
+        raise HTTPException(status_code=400, detail={
+            "error": "validation_failed", "fields": ["email"]})
+    email = body["email"].strip().lower()
     password = body.get("password", "")
-    company = str(body.get("company", "")).strip()[:120]
+    _company = body.get("company", "")
+    company = _company.strip()[:120] if isinstance(_company, str) else ""
     if not _EMAIL_RE.match(email):
         raise HTTPException(status_code=400, detail={
             "error": "validation_failed", "fields": ["email"]})
@@ -515,8 +519,13 @@ async def auth_login(request: Request):
         raise HTTPException(status_code=429,
                             detail={"error": "rate_limited"})
     body = await _json_body(request)
-    email = str(body.get("email", "")).strip().lower()
-    password = body.get("password", "")
+    if not isinstance(body.get("email"), str) or \
+            not isinstance(body.get("password"), str):
+        raise HTTPException(status_code=400, detail={
+            "error": "validation_failed",
+            "fields": ["email", "password"]})
+    email = body["email"].strip().lower()
+    password = body["password"]
     user = get_user_by_email(email)
     # Product decision (Kartikey, 2026-10-22): the auth flow tells the
     # user which side is wrong — unknown email routes to signup, an

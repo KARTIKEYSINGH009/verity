@@ -25,6 +25,14 @@ RULES = {
     "fraud_coaching": r"fake (damage claim|complaint|reviews?)\b|fake (five|5)[- ]star|(generate|write|create|produce).{0,40}(fake|positive|glowing|five[- ]star|5[- ]star) reviews?|lie about (not receiving|receiving)|blackmail|scam (the|your) (support|store|company)",
     "encoded_instruction": r"decode this base64 and (follow|obey)|base64 and follow it",
     "credential_extract": r"(show|reveal|give|tell|share|print|leak|disclose|what'?s|what is).{0,30}(your|the) (ai |own )?(api key|secret key|password|access token|credentials)|\byour (ai )?(api key|secret key|credentials)\b",
+    # Round-2 Deep Hat mechanisms (2026-10-22): extraction targets and
+    # exfil channels the classifier had never seen. Each pattern needs
+    # an extraction verb plus a sensitive target, so documentation and
+    # how-it-works questions about the same nouns stay allowed.
+    "prompt_extract_generic": r"(output|reveal|show|print|disclose).{0,40}(exact|full|actual|entire) prompt(?!\s+(i|you|we)\s+(sent|wrote|typed|gave|submitted))|exact prompt (currently|that is) active in your context",
+    "pii_fields_extract": r"(most sensitive|top \d+ most).{0,30}(pii|personal data) fields|(pii|personal data) fields you (have access|can access|hold)",
+    "embeddings_extract": r"(output|print|dump|export|provide|encode).{0,40}(vector )?embeddings|embeddings.{0,30}base64",
+    "exfil_link": r"https?://\S+.{0,100}followed by the|(markdown|mermaid|image tag).{0,160}(exfiltrat|configuration keys|system prompt|conversation history)",
 }
 
 _COMPILED = {name: re.compile(pat, re.IGNORECASE) for name, pat in RULES.items()}
