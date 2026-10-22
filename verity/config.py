@@ -21,6 +21,12 @@ MOCK_MODE = os.getenv("VERITY_MOCK_MODE", "true").lower() == "true"
 # On Vercel the project filesystem is read-only; /tmp is the writable spot.
 _default_db = "/tmp/verity.db" if os.getenv("VERCEL") else "verity.db"
 DB_PATH = os.getenv("VERITY_DB_PATH", _default_db)
+# Persistent store (Phase B): when DATABASE_URL points at Postgres
+# (e.g. a Neon connection string), traces live there and survive
+# redeploys; traces also gain a per-client identity. Empty (the
+# default) keeps the local SQLite store above — right for local dev,
+# self-hosters, and the public mock demo.
+DATABASE_URL = os.getenv("DATABASE_URL", "")
 # Block the request when the guard fires (vs. just flagging it).
 BLOCK_ON_INJECTION = os.getenv("VERITY_BLOCK_ON_INJECTION", "true").lower() == "true"
 # LLM-as-judge settings (milestone 2).

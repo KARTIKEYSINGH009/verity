@@ -4,6 +4,7 @@ Drop-in replacement for the OpenAI chat-completions endpoint:
 point your client at http://<verity-host>:8000/v1 instead of
 https://api.openai.com/v1. Everything else stays the same.
 """
+import hashlib
 import hmac
 import time
 from collections import defaultdict, deque
@@ -145,8 +146,20 @@ def health():
             "client_auth": bool(config.CLIENT_KEYS)}
 
 
+def _client_id(authorization: str | None) -> str:
+    """Stable per-client identity for traces: a hash prefix of the
+    presented client key (never the raw key, which must not be stored).
+    Empty when the deployment runs open (public demo / local dev)."""
+    if not config.CLIENT_KEYS or not authorization:
+        return ""
+    token = authorization.removeprefix("Bearer ").strip()
+    if not token:
+        return ""
+    return hashlib.sha256(token.encode()).hexdigest()[:12]
+
+
 @app.get("/v1/traces")
-def traces(limit: int = 50,
+def traces(limit: int = 50, client_id: str | None = None,
            x_verity_admin_key: str | None = Header(default=None)):
     """Trace access is admin-only: traces contain raw prompts and answers.
 
@@ -160,7 +173,8 @@ def traces(limit: int = 50,
             "reason": "set VERITY_ADMIN_KEY to enable trace access"})
     if not hmac.compare_digest(x_verity_admin_key or "", config.ADMIN_KEY):
         raise HTTPException(status_code=401, detail={"error": "unauthorized"})
-    return {"traces": recent_traces(max(1, min(limit, 200)))}
+    return {"traces": recent_traces(max(1, min(limit, 200)),
+                                     client_id=client_id)}
 
 
 # Best-effort per-client rate limit (in-memory; per instance on serverless).
@@ -234,8 +248,10 @@ async def chat_completions(req: ChatRequest, request: Request,
             blocked_role = m.role
     if blocked_role is not None:
         flags.append(f"role:{blocked_role}")
+    cid = _client_id(authorization)
     if blocked_role is not None and config.BLOCK_ON_INJECTION:
-        log_trace(req.model, combined, "", 0.0, blocked=True, flags=flags)
+        log_trace(req.model, combined, "", 0.0, blocked=True, flags=flags,
+                  client_id=cid)
         raise HTTPException(status_code=400, detail={
             "error": "blocked_by_verity_guard", "matched_rules": flags})
 
@@ -245,7 +261,8 @@ async def chat_completions(req: ChatRequest, request: Request,
         pol = policy_check_request(req.policy_context, combined)
         if pol["blocked"]:
             pflags = list(flags) + ["policy_violation"]
-            log_trace(req.model, combined, "", 0.0, blocked=True, flags=pflags)
+            log_trace(req.model, combined, "", 0.0, blocked=True,
+                      flags=pflags, client_id=cid)
             raise HTTPException(status_code=400, detail={
                 "error": "blocked_by_verity_policy",
                 "action": pol["action"], "reason": pol["reason"]})
@@ -269,7 +286,7 @@ async def chat_completions(req: ChatRequest, request: Request,
             pflags = list(flags) + ["policy_violation"]
             latency_ms = (time.perf_counter() - started) * 1000
             log_trace(req.model, combined, answer, latency_ms, blocked=True,
-                      flags=pflags)
+                      flags=pflags, client_id=cid)
             raise HTTPException(status_code=400, detail={
                 "error": "policy_violation_in_response",
                 "action": policy_result.get("action"),
@@ -289,7 +306,8 @@ async def chat_completions(req: ChatRequest, request: Request,
     latency_ms = (time.perf_counter() - started) * 1000
     log_trace(req.model, combined, answer, latency_ms,
               flags=flags,
-              faithfulness=score["score"] if score else None)
+              faithfulness=score["score"] if score else None,
+              client_id=cid)
 
     result.setdefault("verity", {}).update(
         {"guard_flags": flags, "faithfulness": score})
