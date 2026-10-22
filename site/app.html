@@ -71,6 +71,12 @@
           </aside>
 
           <div class="dash-main">
+            <div class="panel" id="verify-banner" hidden>
+              <h3 style="margin-top:0">Verify your email to activate your key</h3>
+              <p class="form-note" id="verify-banner-text" style="margin:0 0 12px">Your API key stays inactive until the account email is verified.</p>
+              <button class="button" type="button" id="resend-btn">Resend verification email</button>
+            </div>
+
             <div class="page-head" style="margin-bottom:0">
               <p class="kicker">Dashboard</p>
               <h2>Overview</h2>
@@ -178,6 +184,33 @@
         document.getElementById('plan-name').textContent =
           me.user.plan.charAt(0).toUpperCase() + me.user.plan.slice(1);
         document.getElementById('key-hint').textContent = me.api_key_hint || '—';
+        if (me.email_verified === false) {
+          var banner = document.getElementById('verify-banner');
+          banner.hidden = false;
+          document.getElementById('resend-btn').addEventListener('click', async function () {
+            var rb = document.getElementById('resend-btn');
+            var vt = document.getElementById('verify-banner-text');
+            rb.disabled = true; rb.textContent = 'Sending…';
+            try {
+              var rr = await fetch('/v1/auth/resend-verification', { method: 'POST' });
+              var rd = await rr.json().catch(function () { return {}; });
+              if (rr.ok) {
+                vt.textContent = 'Verification email sent — click the link in it to activate your key.';
+                rb.textContent = 'Email sent';
+              } else if ((rd.detail || {}).error === 'email_not_configured') {
+                vt.textContent = 'Email delivery is not configured on this deployment yet, so the link cannot be sent. Your key activates once the founder enables email sending.';
+                rb.textContent = 'Resend verification email';
+                rb.disabled = false;
+              } else {
+                vt.textContent = 'Sending failed just now. Please try again in a moment.';
+                rb.textContent = 'Resend verification email';
+                rb.disabled = false;
+              }
+            } catch (e) {
+              rb.disabled = false; rb.textContent = 'Resend verification email';
+            }
+          });
+        }
         document.getElementById('stat-total').textContent = me.usage.total;
         document.getElementById('stat-blocked').textContent = me.usage.blocked;
         document.getElementById('stat-latency').textContent =

@@ -42,6 +42,7 @@
               <strong>Save your API key now — it is shown only once.</strong>
               <code id="new-key"></code>
               <p class="form-note" style="margin:0">Use it as the <code>api_key</code> with base URL <code id="base-url"></code>. Lost it? Regenerate from your dashboard (the old one stops working).</p>
+              <p class="form-note" id="verify-note" style="display:none;margin:8px 0 0"></p>
               <p style="margin:12px 0 0"><a class="button primary" href="/dashboard">Continue to your dashboard</a></p>
             </div>
             <div class="form-alert" id="auth-alert" role="alert"></div>
@@ -160,6 +161,13 @@
           });
           var data = await resp.json().catch(function () { return {}; });
           if (resp.status === 201) {
+            if (data.email_verified === false) {
+              var vn = document.getElementById('verify-note');
+              vn.style.display = 'block';
+              vn.textContent = data.email_delivery
+                ? 'One more step: we sent a verification link to your email. Your API key activates as soon as you click it.'
+                : 'Your account is created, but email delivery is not configured on this deployment yet, so the verification link cannot be sent. Your key activates once the founder enables email sending.';
+            }
             document.getElementById('new-key').textContent = data.api_key;
             document.getElementById('base-url').textContent = location.origin + '/v1';
             document.getElementById('key-reveal').classList.add('show');
@@ -167,7 +175,10 @@
             return;
           }
           var d = data.detail || {};
-          if (d.error === 'email_taken') {
+          if (d.error === 'disposable_email') {
+            alertBox.textContent = 'That looks like a disposable email address. Please sign up with a permanent email.';
+            alertBox.classList.add('show');
+          } else if (d.error === 'email_taken') {
             alertBox.textContent = 'Account exists — that email is already registered.';
             var cta = document.getElementById('taken-cta');
             cta.href = '/login?email=' + encodeURIComponent(form.elements.email.value) + '&notice=exists';
