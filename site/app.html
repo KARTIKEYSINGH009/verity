@@ -120,6 +120,10 @@
             <div class="panel" id="settings">
               <b>Settings</b>
               <p id="settings-copy" style="margin-bottom:10px">Loading…</p>
+              <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;color:var(--muted);font-size:.95rem;margin-bottom:14px">
+                <input id="marketing-toggle" type="checkbox" style="margin-top:3px" />
+                <span>Email me product updates, upgrade offers, and reminders. Unsubscribe anytime — every email carries an unsubscribe link.</span>
+              </label>
               <button class="button secondary" id="logout-btn" type="button">Sign out</button>
             </div>
           </div>
@@ -194,6 +198,7 @@
         }
         document.getElementById('snippet').textContent =
           'client = OpenAI(\n  base_url="' + location.origin + '/v1",\n  api_key="vk-…")  # your key';
+        document.getElementById('marketing-toggle').checked = !!me.marketing_opt_in;
         document.getElementById('settings-copy').textContent =
           'Account: ' + me.user.email + (me.user.company ? ' · Company: ' + me.user.company : '') +
           ' · Plan: ' + me.user.plan + '. To change your email or delete your account and data, contact the founder via the pilot page — deletion is confirmed in writing.';
@@ -223,6 +228,14 @@
         document.getElementById('new-key').textContent = data.api_key;
         document.getElementById('key-reveal').classList.add('show');
         document.getElementById('key-hint').textContent = 'vk-…' + data.api_key.slice(-4);
+      });
+
+      document.getElementById('marketing-toggle').addEventListener('change', async function (ev) {
+        var resp = await fetch('/v1/me/preferences', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ marketing_opt_in: ev.target.checked })
+        });
+        if (!resp.ok) { ev.target.checked = !ev.target.checked; }
       });
 
       document.getElementById('logout-btn').addEventListener('click', async function () {

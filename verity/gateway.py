@@ -26,9 +26,11 @@ from .policy import check_response as policy_check_response
 from .scoring import faithfulness_score
 from .store import (DuplicateEmail, active_api_key, create_session,
                     create_user, delete_session, find_api_key,
-                    get_user_by_email, get_user_by_id, get_user_by_session,
-                    init_db, issue_api_key, log_pilot_request, log_trace,
-                    recent_pilot_requests, recent_traces, revoke_api_keys,
+                    get_marketing_state, get_user_by_email,
+                    get_user_by_id, get_user_by_session,
+                    get_user_by_unsubscribe_token, init_db, issue_api_key,
+                    log_pilot_request, log_trace, recent_pilot_requests,
+                    recent_traces, revoke_api_keys, set_marketing_opt_in,
                     usage_for_client)
 
 
@@ -409,6 +411,9 @@ async def auth_signup(request: Request):
     except DuplicateEmail:
         raise HTTPException(status_code=409,
                             detail={"error": "email_taken"})
+    if body.get("marketing_opt_in") is True:
+        set_marketing_opt_in(user_id, True,
+                             secrets.token_urlsafe(24))
     api_key = _portal_key(user_id)
     return _start_session(request,
                           {"user": _public_user(get_user_by_id(user_id)),
@@ -464,6 +469,8 @@ def me(request: Request):
                          "month_total": 0},
                "quota": ({"limit_per_month": config.FREE_MONTHLY_QUOTA}
                          if user["plan"] == "free" else None),
+               "marketing_opt_in": get_marketing_state(
+                   user["id"])["opt_in"],
                "traces": []}
     if key:
         client_id = key["key_hash"][:12]
@@ -477,6 +484,37 @@ def me(request: Request):
              "faithfulness": t["faithfulness"]}
             for t in recent_traces(limit=10, client_id=client_id)]
     return payload
+
+
+@app.post("/v1/me/preferences")
+async def me_preferences(request: Request):
+    user = _session_user(request)
+    if not user:
+        raise HTTPException(status_code=401,
+                            detail={"error": "not_signed_in"})
+    body = await _json_body(request)
+    opt_in = body.get("marketing_opt_in")
+    if not isinstance(opt_in, bool):
+        raise HTTPException(status_code=400, detail={
+            "error": "validation_failed", "fields": ["marketing_opt_in"]})
+    state = get_marketing_state(user["id"])
+    token = state["unsubscribe_token"]
+    if opt_in and not token:
+        token = secrets.token_urlsafe(24)
+    set_marketing_opt_in(user["id"], opt_in, token)
+    return {"marketing_opt_in": opt_in}
+
+
+@app.post("/v1/email/unsubscribe")
+async def email_unsubscribe(request: Request):
+    body = await _json_body(request)
+    token = str(body.get("token", ""))
+    user = get_user_by_unsubscribe_token(token)
+    if not user:
+        raise HTTPException(status_code=404,
+                            detail={"error": "invalid_token"})
+    set_marketing_opt_in(user["id"], False)
+    return {"status": "unsubscribed", "email": user["email"]}
 
 
 @app.post("/v1/keys/regenerate")
@@ -794,6 +832,11 @@ def signup_page():
 @app.get("/login", include_in_schema=False)
 def login_page():
     return FileResponse(_site_dir / "login.html")
+
+
+@app.get("/unsubscribe", include_in_schema=False)
+def unsubscribe_page():
+    return FileResponse(_site_dir / "unsubscribe.html")
 
 
 @app.get("/documentation", include_in_schema=False)

@@ -455,6 +455,107 @@ def delete_session(token_hash) -> None:
           (token_hash,), fetch="none")
 
 
+# --- Email marketing: opt-in state, unsubscribe tokens, send log ---------
+
+def _exec(sqlite_sql, pg_sql, params) -> None:
+    _rows(sqlite_sql, pg_sql, params, fetch="none")
+
+def _ensure_marketing_columns() -> None:
+    if _use_postgres():
+        for stmt in (
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS"
+                " marketing_opt_in INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS"
+                " unsubscribe_token TEXT"):
+            _exec(stmt, stmt, ())
+    else:
+        cols = [r["name"] for r in _rows(
+            "SELECT name FROM pragma_table_info('users')",
+            "SELECT name FROM pragma_table_info('users')", ())]
+        if "marketing_opt_in" not in cols:
+            _exec("ALTER TABLE users ADD COLUMN marketing_opt_in"
+                  " INTEGER NOT NULL DEFAULT 0",
+                  "ALTER TABLE users ADD COLUMN marketing_opt_in"
+                  " INTEGER NOT NULL DEFAULT 0", ())
+        if "unsubscribe_token" not in cols:
+            _exec("ALTER TABLE users ADD COLUMN unsubscribe_token TEXT",
+                  "ALTER TABLE users ADD COLUMN unsubscribe_token TEXT",
+                  ())
+    _exec(
+        "CREATE TABLE IF NOT EXISTS email_log ("
+        " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " user_id INTEGER, email TEXT NOT NULL, kind TEXT NOT NULL,"
+        " subject TEXT NOT NULL, sent_ts REAL NOT NULL)",
+        "CREATE TABLE IF NOT EXISTS email_log ("
+        " id BIGSERIAL PRIMARY KEY,"
+        " user_id BIGINT, email TEXT NOT NULL, kind TEXT NOT NULL,"
+        " subject TEXT NOT NULL, sent_ts DOUBLE PRECISION NOT NULL)",
+        ())
+
+
+def get_marketing_state(user_id) -> dict:
+    _ensure_marketing_columns()
+    row = _rows("SELECT marketing_opt_in, unsubscribe_token FROM users"
+                " WHERE id = ?",
+                "SELECT marketing_opt_in, unsubscribe_token FROM users"
+                " WHERE id = %s", (user_id,), fetch="one")
+    if not row:
+        return {"opt_in": False, "unsubscribe_token": None}
+    return {"opt_in": bool(row["marketing_opt_in"]),
+            "unsubscribe_token": row["unsubscribe_token"]}
+
+
+def set_marketing_opt_in(user_id, opt_in, unsubscribe_token=None) -> None:
+    _ensure_marketing_columns()
+    if unsubscribe_token:
+        _exec("UPDATE users SET marketing_opt_in = ?,"
+              " unsubscribe_token = ? WHERE id = ?",
+              "UPDATE users SET marketing_opt_in = %s,"
+              " unsubscribe_token = %s WHERE id = %s",
+              (1 if opt_in else 0, unsubscribe_token, user_id))
+    else:
+        _exec("UPDATE users SET marketing_opt_in = ? WHERE id = ?",
+              "UPDATE users SET marketing_opt_in = %s WHERE id = %s",
+              (1 if opt_in else 0, user_id))
+
+
+def get_user_by_unsubscribe_token(token):
+    if not token:
+        return None
+    _ensure_marketing_columns()
+    return _rows("SELECT * FROM users WHERE unsubscribe_token = ?",
+                 "SELECT * FROM users WHERE unsubscribe_token = %s",
+                 (token,), fetch="one")
+
+
+def marketing_audience() -> list:
+    """Users who opted IN to product emails — the only addresses a
+    campaign may go to."""
+    _ensure_marketing_columns()
+    rows = _rows("SELECT * FROM users WHERE marketing_opt_in = 1",
+                 "SELECT * FROM users WHERE marketing_opt_in = 1", ())
+    return [dict(r) for r in rows]
+
+
+def record_email_send(user_id, email, kind, subject, sent_ts) -> None:
+    _ensure_marketing_columns()
+    _exec("INSERT INTO email_log (user_id, email, kind, subject,"
+          " sent_ts) VALUES (?, ?, ?, ?, ?)",
+          "INSERT INTO email_log (user_id, email, kind, subject,"
+          " sent_ts) VALUES (%s, %s, %s, %s, %s)",
+          (user_id, email, kind, subject, sent_ts))
+
+
+def email_log_for(email) -> list:
+    _ensure_marketing_columns()
+    rows = _rows("SELECT * FROM email_log WHERE email = ?"
+                 " ORDER BY sent_ts",
+                 "SELECT * FROM email_log WHERE email = %s"
+                 " ORDER BY sent_ts", (email,))
+    return [dict(r) for r in rows]
+
+
+
 def issue_api_key(user_id, key_hash, key_hint) -> int:
     return _rows(
         "INSERT INTO api_keys (user_id, key_hash, key_hint, created_ts)"

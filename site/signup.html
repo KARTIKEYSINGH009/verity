@@ -61,6 +61,10 @@
                 <label for="s-password">Password (8+ characters)</label>
                 <input id="s-password" name="password" type="password" autocomplete="new-password" required minlength="8" />
               </div>
+              <label style="display:flex;gap:10px;align-items:flex-start;font-weight:400;cursor:pointer">
+                <input id="s-marketing" name="marketing" type="checkbox" style="width:auto;margin-top:3px" />
+                <span>Email me product updates, upgrade offers, and reminders. Optional — unsubscribe anytime.</span>
+              </label>
               <button class="button primary" type="submit" id="signup-btn">Create free account</button>
             </form>
             <p class="form-note" style="text-align:center">By continuing, you agree to the <a href="/documentation#data">Terms &amp; Privacy summary</a>.</p>
@@ -152,7 +156,7 @@
         try {
           var resp = await fetch('/v1/auth/signup', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ company: form.elements.company.value, email: form.elements.email.value, password: form.elements.password.value })
+            body: JSON.stringify({ company: form.elements.company.value, email: form.elements.email.value, password: form.elements.password.value, marketing_opt_in: document.getElementById('s-marketing').checked })
           });
           var data = await resp.json().catch(function () { return {}; });
           if (resp.status === 201) {
