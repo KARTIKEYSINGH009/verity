@@ -207,30 +207,37 @@ def _load_one(path: str) -> dict | None:
 
 
 def _load_with_sibling(path: str) -> dict | None:
-    """Load a model, merging its _part2 sibling when present.
+    """Load a model, merging its _partN siblings when present.
 
-    The trained weights ship split across two files so each stays small;
-    the merge is transparent to callers.
+    The trained weights ship split across several files so each stays
+    small enough for the connector push cap; the merge is transparent
+    to callers and older two-part models still load (parts are merged
+    in order until one is missing).
     """
     model = _load_one(path)
     if model is None:
         return None
-    sibling = _sibling_path(path)
-    if sibling != path:
-        extra = _load_one(sibling)
-        if extra is not None:
+    if path.endswith(".json"):
+        n = 2
+        while True:
+            sibling = path[:-5] + f"_part{n}.json"
+            extra = _load_one(sibling)
+            if extra is None:
+                break
             for c in CLASSES:
                 model["log_prob"][c].update(extra["log_prob"][c])
-            model["vocab_size"] = len(model["log_prob"]["malicious"])
+            n += 1
+        model["vocab_size"] = len(model["log_prob"]["malicious"])
     return model
 
 
 def save_model(model: dict, path: str) -> None:
     """Write weights in the compact array format (rounded floats), split
-    across the main file and a _part2 sibling so each file stays small."""
+    across the main file and _part2/_part3 siblings so each file stays
+    under the connector push cap."""
     fmt = _to_file_format(model)
     n = len(fmt["vocab"])
-    half = (n + 1) // 2
+    third = (n + 2) // 3
 
     def part(idxs: list[int]) -> dict:
         return {
@@ -247,6 +254,9 @@ def save_model(model: dict, path: str) -> None:
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as fh:
-        json.dump(part(list(range(0, half))), fh)
+        json.dump(part(list(range(0, third))), fh)
     with open(_sibling_path(path), "w", encoding="utf-8") as fh:
-        json.dump(part(list(range(half, n))), fh)
+        json.dump(part(list(range(third, 2 * third))), fh)
+    part3 = path[:-5] + "_part3.json" if path.endswith(".json") else path
+    with open(part3, "w", encoding="utf-8") as fh:
+        json.dump(part(list(range(2 * third, n))), fh)
