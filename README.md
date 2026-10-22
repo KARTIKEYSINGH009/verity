@@ -112,7 +112,7 @@ Point your OpenAI client at `http://localhost:8000/v1` instead of
 `https://api.openai.com/v1` — that's the whole integration.
 
 Dashboard: `streamlit run dashboard/app.py`
-Tests: `pytest` (120 passing, including a red-team suite covering all abuse families)
+Tests: `pytest` (169 passing, including a red-team suite covering all abuse families)
 
 ## Configuration
 
@@ -207,15 +207,15 @@ including run metadata: commit, dataset sizes, latency percentiles).
 
 | Mode | Recall | Precision | F1 | False-positive rate |
 | --- | --- | --- | --- | --- |
-| Rules only | 0.0 | — | — | 0.0 |
-| Classifier only | 0.88 | 0.917 | 0.898 | 0.10 |
+| Rules only | 0.04 | 1.0 | 0.077 | 0.0 |
+| Classifier only | 0.84 | 0.913 | 0.875 | 0.10 |
 | Combined (production) | 0.88 | 0.917 | 0.898 | 0.10 |
 
-Per-category recall (combined): injection, impersonation, social
-engineering, and data theft at 1.0; fraud (0.67), harmful-content and
-multilingual paraphrases (0.5) are the known weak classes and the top
-priority for dataset growth.
-Screening latency locally: p50 ≈ 0.2 ms, p95 ≈ 0.7 ms (screening only,
+Per-category recall (combined): injection, impersonation, data
+theft, multilingual, and spacing at 1.0; social engineering at 0.80;
+fraud (0.67) and harmful content (0.50) are the known weak classes and
+the top priority for dataset growth.
+Screening latency locally: p50 ≈ 0.27 ms, p95 ≈ 0.59 ms (screening only,
 excluding the model provider call). Faithfulness heuristic (the judge's
 offline fallback): 0.75 verdict accuracy on an 8-case labelled mini-eval,
 unsupported-answer precision 1.0 / recall 0.5 — small-sample signal, not
