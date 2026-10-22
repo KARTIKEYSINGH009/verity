@@ -578,3 +578,16 @@ footer .wrap { display: flex; justify-content: space-between; gap: 24px; color: 
 .panel { border: 1px solid var(--line); border-radius: 12px; padding: 22px; background: var(--surface); }
 .panel > b { display: block; font-size: 1.12rem; font-weight: 650; letter-spacing: -.015em; margin-bottom: 8px; }
 .panel p { color: var(--muted); font-size: .95rem; }
+
+/* Pricing plan cards: equal-height, CTAs aligned at the bottom. */
+.price-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 40px; align-items: stretch; }
+.price-card { border: 1px solid var(--line-strong); border-radius: 12px; padding: 24px; background: var(--surface); display: flex; flex-direction: column; }
+.price-card > b { font-size: 1.12rem; font-weight: 650; letter-spacing: -.015em; }
+.price-card .amt { font-size: 1.45rem; color: var(--ink); margin: 10px 0 2px; }
+.price-card .amt span { font-size: .92rem; color: var(--muted); }
+.price-card p { color: var(--muted); font-size: .93rem; }
+.price-card ul { list-style: none; margin: 14px 0 20px; padding: 0; display: grid; gap: 8px; color: var(--muted); font-size: .93rem; }
+.price-card ul li::before { content: "·"; margin-right: 8px; color: var(--accent); font-weight: 700; }
+.price-card .cta { margin-top: auto; }
+.price-card .cta .button { width: 100%; text-align: center; }
+@media (max-width: 860px) { .price-grid { grid-template-columns: 1fr; } }
