@@ -12,10 +12,10 @@
     .dash-side { position: sticky; top: 84px; border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: var(--surface); }
     .dash-side .who { padding: 4px 8px 12px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
     .dash-side .who b { display: block; }
-    .dash-side .who span { color: var(--muted); font-size: .85rem; word-break: break-all; }
+    .dash-side .who span { color: var(--muted); font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
     .dash-side a { display: block; padding: 8px; border-radius: 8px; color: var(--ink); text-decoration: none; }
     .dash-side a:hover { background: var(--surface-2); }
-    .dash-main { display: grid; gap: 16px; min-width: 0; }
+    .dash-main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
     .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
     .stat-num { font-size: 1.9rem; font-weight: 700; line-height: 1.1; }
     .quota-meter { height: 8px; border-radius: 99px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; margin-top: 8px; }
@@ -61,13 +61,13 @@
         <div class="dash">
           <aside class="dash-side" aria-label="Dashboard sections">
             <div class="who"><b id="who-company">Workspace</b><span id="who-email">Loading…</span></div>
-            <a href="#overview">Overview</a>
-            <a href="#keys">API Keys</a>
-            <a href="#usage">Usage</a>
-            <a href="#traces">Traces</a>
-            <a href="#policies">Policies</a>
-            <a href="#billing">Billing</a>
-            <a href="#settings">Settings</a>
+            <a href="#overview" class="active" aria-current="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>Overview</a>
+            <a href="#keys"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 4l3 3M14 7l3 3"/></svg>API Keys</a>
+            <a href="#usage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>Usage</a>
+            <a href="#traces"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Traces</a>
+            <a href="#policies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="m9 12 2 2 4-4"/></svg>Policies</a>
+            <a href="#billing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>Billing</a>
+            <a href="#settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>Settings</a>
           </aside>
 
           <div class="dash-main">
@@ -79,7 +79,7 @@
 
             <div class="page-head" style="margin-bottom:0">
               <p class="kicker">Dashboard</p>
-              <h2>Overview</h2>
+              <h1>Overview</h1>
               <p id="plan-line">Loading your account…</p>
             </div>
 
@@ -97,9 +97,11 @@
               <div class="key-reveal" id="key-reveal">
                 <strong>New key — shown only once. The old key has stopped working.</strong>
                 <code id="new-key"></code>
+                <p style="margin:10px 0 0"><button class="copy-btn" type="button" data-copy-target="#new-key">Copy API key</button></p>
               </div>
               <p style="margin-top:12px;color:var(--muted);font-size:.92rem">Keys are stored only as hashes. Send yours as <code>Authorization: Bearer &lt;key&gt;</code> — the OpenAI client does this automatically when you set it as its <code>api_key</code>:</p>
               <pre class="code" id="snippet">…</pre>
+              <p style="margin-top:10px"><button class="copy-btn" type="button" data-copy-target="#snippet">Copy snippet</button></p>
             </div>
 
             <div class="panel" id="usage">
@@ -109,6 +111,7 @@
 
             <div class="panel" id="traces">
               <b>Recent security events &amp; traces</b>
+              <div class="trace-filters" role="group" aria-label="Filter traces"><button class="trace-filter" type="button" data-trace-filter="all" aria-pressed="true">All</button><button class="trace-filter" type="button" data-trace-filter="blocked" aria-pressed="false">Blocked</button><button class="trace-filter" type="button" data-trace-filter="passed" aria-pressed="false">Passed</button></div>
               <div id="trace-list"><p style="color:var(--muted)">Loading…</p></div>
             </div>
 
@@ -246,7 +249,7 @@
               : '<span class="verdict pass">PASSED</span>';
             var faith = (t.faithfulness === null || t.faithfulness === undefined)
               ? '' : ' · faithfulness ' + Number(t.faithfulness).toFixed(2);
-            return '<div class="trace-row"><span class="t-time">' + esc(when) + '</span>' +
+            return '<div class="trace-row" data-blocked="' + (t.blocked ? '1' : '0') + '"><span class="t-time">' + esc(when) + '</span>' +
               '<span class="t-input">' + esc(t.input_text) + '</span>' +
               '<span>' + verdict + faith + '</span></div>';
           }).join('');
@@ -274,6 +277,20 @@
       document.getElementById('logout-btn').addEventListener('click', async function () {
         await fetch('/v1/auth/logout', { method: 'POST' });
         location.href = '/login';
+      });
+    })();
+  </script>
+  <script>
+    (function () {
+      document.addEventListener('click', function (ev) {
+        var btn = ev.target.closest ? ev.target.closest('[data-trace-filter]') : null;
+        if (!btn) return;
+        var mode = btn.getAttribute('data-trace-filter');
+        document.querySelectorAll('[data-trace-filter]').forEach(function (b) { b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'); });
+        document.querySelectorAll('.trace-row').forEach(function (row) {
+          var blocked = row.getAttribute('data-blocked') === '1';
+          row.style.display = (mode === 'all' || (mode === 'blocked' && blocked) || (mode === 'passed' && !blocked)) ? '' : 'none';
+        });
       });
     })();
   </script>

@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Documentation — Verity</title>
   <meta name="description" content="Verity integration guide: the one-line base_url change, client keys, business policy enforcement, grounding checks, error codes and limits." />
+  <link rel="canonical" href="https://verity-nine-flame.vercel.app/documentation" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Documentation — Verity" />
+  <meta property="og:description" content="Verity integration guide: the one-line base_url change, client keys, business policy enforcement, grounding checks, error codes and limits." />
+  <meta property="og:url" content="https://verity-nine-flame.vercel.app/documentation" />
+  <meta property="og:image" content="https://verity-nine-flame.vercel.app/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://verity-nine-flame.vercel.app/og-image.png" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="stylesheet" href="/styles.css" />
   <style>
@@ -22,8 +30,8 @@
       <a class="brand" href="/" aria-label="Verity home"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C15.5 3.8 18 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>Verity</a>
       <nav aria-label="Primary">
         <a href="/product">Product</a>
-        <a href="/playground" aria-current="page">Playground</a>
-        <a href="/documentation">Docs</a>
+        <a href="/playground">Playground</a>
+        <a href="/documentation" aria-current="page">Docs</a>
         <a href="/pricing">Pricing</a>
       </nav>
       <div class="top-actions">
@@ -37,11 +45,11 @@
 
 
   <main>
-    <section class="block">
+    <section class="block" id="integration">
       <div class="wrap">
-        <div class="section-head">
+        <div class="page-head">
           <p class="kicker">Documentation</p>
-          <h2>Integrate in one line. Enforce policy on every call.</h2>
+          <h1>Integrate in one line. Enforce policy on every call.</h1>
           <p>Verity is an OpenAI-compatible gateway. If your app already talks to an OpenAI-compatible API, integration is a base-URL change plus a client key — your prompts, models and SDK stay exactly as they are.</p>
         </div>
         <pre class="code"><span class="cm"># Before</span>
@@ -54,7 +62,18 @@ client = OpenAI(base_url="https://your-verity-deployment/v1",
       </div>
     </section>
 
-    <section class="block">
+    <div class="wrap">
+      <div class="docs-layout">
+        <aside class="docs-toc" aria-label="Documentation contents">
+          <b>On this page</b>
+          <a href="#integration">Integration</a>
+          <a href="#policy">Business policy</a>
+          <a href="#errors">Error codes</a>
+          <a href="#limits">Limits</a>
+          <a href="#data">Data &amp; privacy</a>
+        </aside>
+        <div class="docs-content">
+    <section class="block" id="policy">
       <div class="wrap">
         <div class="section-head">
           <h2>Business policy</h2>
@@ -73,13 +92,13 @@ client = OpenAI(base_url="https://your-verity-deployment/v1",
       </div>
     </section>
 
-    <section class="block">
+    <section class="block" id="errors">
       <div class="wrap">
         <div class="section-head">
           <h2>Error codes</h2>
           <p>Verity speaks plainly. Your client code only needs to handle these:</p>
         </div>
-        <table class="docs-table">
+        <div class="table-scroll"><table class="docs-table">
           <thead><tr><th>Status</th><th>Error</th><th>Meaning</th></tr></thead>
           <tbody>
             <tr><td><code>200</code></td><td>—</td><td>Request passed screening; the model's answer passed policy and faithfulness checks.</td></tr>
@@ -90,11 +109,11 @@ client = OpenAI(base_url="https://your-verity-deployment/v1",
             <tr><td><code>413</code></td><td><code>request_too_large</code> / <code>context_too_large</code></td><td>Input or a supplied context exceeded the size caps.</td></tr>
             <tr><td><code>429</code></td><td><code>rate_limited</code></td><td>Per-client rate limit (120 requests/minute by default) exceeded.</td></tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
     </section>
 
-    <section class="block">
+    <section class="block" id="limits">
       <div class="wrap">
         <div class="section-head">
           <h2>Limits, honestly.</h2>
@@ -120,6 +139,9 @@ client = OpenAI(base_url="https://your-verity-deployment/v1",
         </div>
       </div>
     </section>
+        </div>
+      </div>
+    </div>
   </main>
 
   <footer class="site-footer">

@@ -33,13 +33,13 @@
         <div class="auth-wrap">
           <div class="page-head center">
             <p class="kicker">Welcome back</p>
-            <h2>Sign in to Verity</h2>
+            <h1>Sign in to Verity</h1>
             <p>Your key, your usage, your traces.</p>
           </div>
           <div class="auth-card">
             <div class="form-alert" id="auth-alert" role="alert"></div>
-            <a class="google-btn" id="google-btn" href="#" aria-disabled="true"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M23.5 12.3c0-.9-.1-1.5-.3-2.2H12v4.3h6.5c-.1 1.1-.8 2.7-2.4 3.8l3.7 2.9c2.3-2.1 3.7-5.2 3.7-9z"/><path fill="#34A853" d="M12 24c3.2 0 5.9-1.1 7.9-2.9l-3.7-2.9c-1 .7-2.4 1.2-4.2 1.2-3.2 0-5.9-2.2-6.9-5.1L1.2 17.2C3.2 21.2 7.3 24 12 24z"/><path fill="#FBBC05" d="M5.1 14.3c-.2-.7-.4-1.5-.4-2.3s.1-1.6.4-2.3L1.2 6.8C.4 8.3 0 10.1 0 12s.4 3.7 1.2 5.2l3.9-2.9z"/><path fill="#EA4335" d="M12 4.7c1.8 0 3 .8 3.7 1.4l3.3-3.2C17.9 1.1 15.2 0 12 0 7.3 0 3.2 2.8 1.2 6.8l3.9 2.9c1-2.9 3.7-5 6.9-5z"/></svg> Continue with Google</a>
-            <p class="form-note" id="google-note" style="text-align:center;margin:8px 0 0">Google sign-in is being configured — email sign-in works now.</p>
+            <div id="oauth-slot" hidden><a class="google-btn" id="google-btn" href="#" aria-disabled="true"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M23.5 12.3c0-.9-.1-1.5-.3-2.2H12v4.3h6.5c-.1 1.1-.8 2.7-2.4 3.8l3.7 2.9c2.3-2.1 3.7-5.2 3.7-9z"/><path fill="#34A853" d="M12 24c3.2 0 5.9-1.1 7.9-2.9l-3.7-2.9c-1 .7-2.4 1.2-4.2 1.2-3.2 0-5.9-2.2-6.9-5.1L1.2 17.2C3.2 21.2 7.3 24 12 24z"/><path fill="#FBBC05" d="M5.1 14.3c-.2-.7-.4-1.5-.4-2.3s.1-1.6.4-2.3L1.2 6.8C.4 8.3 0 10.1 0 12s.4 3.7 1.2 5.2l3.9-2.9z"/><path fill="#EA4335" d="M12 4.7c1.8 0 3 .8 3.7 1.4l3.3-3.2C17.9 1.1 15.2 0 12 0 7.3 0 3.2 2.8 1.2 6.8l3.9 2.9c1-2.9 3.7-5 6.9-5z"/></svg> Continue with Google</a>
+            <p class="form-note" id="google-note" style="text-align:center;margin:8px 0 0">Google sign-in is being configured — email sign-in works now.</p></div>
             <div class="or-line">or</div>
             <form class="auth-form" id="login-form">
               <div>

@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Product — Verity</title>
   <meta name="description" content="How Verity works: input guard, policy guard, faithfulness judge and traces between your application and any model — plus deployment options and honest limitations." />
+  <link rel="canonical" href="https://verity-nine-flame.vercel.app/product" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Product — Verity" />
+  <meta property="og:description" content="How Verity works: input guard, policy guard, faithfulness judge and traces between your application and any model — plus deployment options and honest limitations." />
+  <meta property="og:url" content="https://verity-nine-flame.vercel.app/product" />
+  <meta property="og:image" content="https://verity-nine-flame.vercel.app/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://verity-nine-flame.vercel.app/og-image.png" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
@@ -32,10 +40,10 @@
       <div class="wrap">
         <div class="page-head">
           <p class="kicker">Product</p>
-          <h2>A security layer between your application and any model.</h2>
+          <h1>A security layer between your application and any model.</h1>
           <p>Verity inspects every request and response, applies security and business logic, evaluates groundedness, and logs structured traces. Your application changes one line — the base URL — and keeps its SDK, prompts and provider account.</p>
         </div>
-        <div class="flow" aria-label="Request lifecycle">
+        <div class="pipeline-flow" aria-label="Request lifecycle">
           <div class="step"><b>Your application</b><p>Web app, agent, or internal tool sends an OpenAI-compatible request.</p></div>
           <span class="arrow" aria-hidden="true">→</span>
           <div class="step"><b>1 · Input Guard</b><p>Rules + trained classifier screen every message role for injection and abuse.</p></div>
@@ -54,7 +62,7 @@
     <section class="block">
       <div class="wrap">
         <div class="section-head"><h2>Each layer in detail.</h2></div>
-        <div class="layers">
+        <div class="layers layers-4">
           <div class="layer"><b>Input Guard</b><p>Detects prompt injection, jailbreak attempts and other malicious inputs. Two systems vote: deterministic rules for known attack shapes, and a Naive Bayes classifier (200 training examples, word + character n-grams) for paraphrases and obfuscation — leetspeak, homoglyphs, spacing tricks and base64 are normalized before screening. Held-out recall 88%, precision 91.7%.</p></div>
           <div class="layer"><b>Policy Guard</b><p>Enforces your custom business rules and content restrictions, declared per request as a <code>policy_context</code>. Checked before the model (a prohibited ask never gets answered) and after it (a non-compliant answer never reaches the user). In live mode the policy judge fails closed.</p></div>
           <div class="layer"><b>Faithfulness Judge</b><p>Checks whether answers are grounded in your context or provided documents. Live mode uses an LLM judge; a content-word heuristic is the disclosed offline fallback. Unsupported claims are flagged in the trace, and policy-violating answers are blocked outright.</p></div>
@@ -80,7 +88,7 @@
           <h2>Implemented vs planned, honestly.</h2>
           <p>Nothing on this page is vaporware-labeled as shipped. The current state:</p>
         </div>
-        <div class="layers">
+        <div class="layers layers-2">
           <div class="layer"><b>Implemented today</b><p>Input guard (rules + trained classifier, all message roles) · policy guard (request + response, fail-closed judge) · faithfulness scoring (LLM judge + heuristic fallback) · per-client traces with 30-day retention · accounts with personal API keys, rotation and revocation · free-tier monthly quota enforced by the gateway · client deployments in live mode (pilot-provisioned).</p></div>
           <div class="layer"><b>Planned — not yet available</b><p>Self-serve live deployments and paid plans (Pro) · streaming response passthrough (responses currently return complete) · team workspaces and roles · configurable retention per plan · usage alerts. These ship when pilot demand validates them, in that order.</p></div>
         </div>

@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pricing — Verity</title>
   <meta name="description" content="Verity pricing: a free tier with your own API key and dashboard, Pro in development, and founder-led pilot deployments with custom pricing." />
+  <link rel="canonical" href="https://verity-nine-flame.vercel.app/pricing" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Pricing — Verity" />
+  <meta property="og:description" content="Verity pricing: a free tier with your own API key and dashboard, Pro in development, and founder-led pilot deployments with custom pricing." />
+  <meta property="og:url" content="https://verity-nine-flame.vercel.app/pricing" />
+  <meta property="og:image" content="https://verity-nine-flame.vercel.app/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://verity-nine-flame.vercel.app/og-image.png" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
@@ -32,7 +40,7 @@
       <div class="wrap">
         <div class="page-head">
           <p class="kicker">Pricing</p>
-          <h2>Start free. Scale as you grow.</h2>
+          <h1>Start free. Scale as you grow.</h1>
           <p>Choose the plan that fits your needs. Everything listed under a plan exists today unless it is explicitly marked as in development — and nothing is charged until a payment flow exists and confirms.</p>
         </div>
         <div class="price-grid">
@@ -52,7 +60,7 @@
           </div>
           <div class="price-card">
             <b>Pro</b>
-            <p class="amt"><strong>Pricing to be finalized</strong></p>
+            <p class="amt"><strong>In development</strong></p>
             <p>For growing teams — in development.</p>
             <ul>
               <li>Higher request limits</li>
@@ -65,7 +73,8 @@
             <p>Pro is being shaped by pilot customers and opens to them first. Start free today; nothing about your account or key changes when Pro opens.</p>
             <div class="cta"><a class="button secondary" href="/signup">Start free first</a></div>
           </div>
-          <div class="price-card">
+          <div class="price-card featured">
+            <span class="plan-badge">Recommended for production</span>
             <b>Pilot / Enterprise</b>
             <p class="amt"><strong>Custom pricing</strong></p>
             <p>For custom deployment, priced per engagement after a scoping call.</p>
@@ -79,6 +88,20 @@
             </ul>
             <div class="cta"><a class="button primary" href="/pilot#request">Request a pilot</a></div>
           </div>
+        </div>
+        <div class="compare-wrap">
+          <h2 style="font-size:1.35rem;margin:0 0 14px">Compare plans</h2>
+          <div class="table-scroll"><table class="compare-matrix">
+            <thead><tr><th>Feature</th><th>Free</th><th>Pro</th><th>Pilot / Enterprise</th></tr></thead>
+            <tbody>
+              <tr><td>Gateway requests</td><td>1,000 / month (enforced)</td><td>Higher limits (planned)</td><td>Custom, per engagement</td></tr>
+              <tr><td>Model</td><td>Mock model on this site</td><td>Live model, self-serve (planned)</td><td>Your provider, your key — live</td></tr>
+              <tr><td>Guard, policy &amp; grounding</td><td>Included</td><td>Advanced configuration (planned)</td><td>Custom policies for your business</td></tr>
+              <tr><td>Traces</td><td>30-day history in your dashboard</td><td>Longer retention (planned)</td><td>In your own dedicated database</td></tr>
+              <tr><td>Deployment</td><td>Shared demo site</td><td>Self-serve (planned)</td><td>Dedicated deployment, isolated</td></tr>
+              <tr><td>Support</td><td>Community via GitHub</td><td>Priority (planned)</td><td>Founder-led, weekly reports</td></tr>
+            </tbody>
+          </table></div>
         </div>
         <p style="margin-top:18px;color:var(--muted)">Prices are set from real running costs. The free tier runs on shared demo infrastructure with a mock model; pilot pricing reflects a dedicated deployment on your own provider account, where model spend stays yours.</p>
       </div>
