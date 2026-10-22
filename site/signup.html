@@ -37,6 +37,7 @@
             <p>Create a free account to manage your AI security gateway, API keys, and usage.</p>
           </div>
           <div class="auth-card">
+            <a class="button secondary" id="taken-cta" href="/login" style="display:none;width:100%;text-align:center;margin-bottom:14px">Go to sign in</a>
             <div class="key-reveal" id="key-reveal">
               <strong>Save your API key now — it is shown only once.</strong>
               <code id="new-key"></code>
@@ -136,6 +137,13 @@
     (function () {
       var form = document.getElementById('signup-form');
       var alertBox = document.getElementById('auth-alert');
+      var params = new URLSearchParams(location.search);
+      var prefill = params.get('email');
+      if (prefill) form.elements.email.value = prefill;
+      if (params.get('notice') === 'not_found') {
+        alertBox.textContent = 'No account with that email yet — create your free account below.';
+        alertBox.classList.add('show');
+      }
       form.addEventListener('submit', async function (ev) {
         ev.preventDefault();
         alertBox.classList.remove('show');
@@ -155,7 +163,12 @@
             return;
           }
           var d = data.detail || {};
-          if (d.error === 'email_taken') alertBox.textContent = 'That email already has an account — sign in instead.';
+          if (d.error === 'email_taken') {
+            alertBox.textContent = 'Account exists — that email is already registered.';
+            var cta = document.getElementById('taken-cta');
+            cta.href = '/login?email=' + encodeURIComponent(form.elements.email.value) + '&notice=exists';
+            cta.style.display = 'block';
+          }
           else if (d.error === 'validation_failed' && (d.fields || []).indexOf('password') >= 0) alertBox.textContent = 'Password needs at least 8 characters.';
           else if (d.error === 'validation_failed') alertBox.textContent = 'Please add a valid work email.';
           else if (resp.status === 429) alertBox.textContent = 'Too many attempts — wait a minute and try again.';

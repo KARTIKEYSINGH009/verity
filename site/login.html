@@ -121,18 +121,33 @@
     (function () {
       var form = document.getElementById('login-form');
       var alertBox = document.getElementById('auth-alert');
+      var params = new URLSearchParams(location.search);
+      var prefill = params.get('email');
+      if (prefill) form.elements.email.value = prefill;
+      if (params.get('notice') === 'exists') {
+        alertBox.textContent = 'That email already has an account — sign in below.';
+        alertBox.classList.add('show');
+      }
       form.addEventListener('submit', async function (ev) {
         ev.preventDefault();
-        if (!alertBox.textContent) alertBox.classList.remove('show');
         var btn = document.getElementById('login-btn');
         btn.disabled = true; btn.textContent = 'Signing in…';
+        var email = form.elements.email.value;
         try {
           var resp = await fetch('/v1/auth/login', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: form.elements.email.value, password: form.elements.password.value })
+            body: JSON.stringify({ email: email, password: form.elements.password.value })
           });
           if (resp.ok) { location.href = '/dashboard'; return; }
-          alertBox.textContent = resp.status === 401 ? 'Email or password does not match our records.'
+          var data = await resp.json().catch(function () { return {}; });
+          var code = (data.detail || {}).error || '';
+          if (resp.status === 404 || code === 'account_not_found') {
+            location.href = '/signup?email=' + encodeURIComponent(email) + '&notice=not_found';
+            return;
+          }
+          alertBox.textContent = code === 'google_account'
+            ? 'This account was created with Google — use "Continue with Google" above.'
+            : resp.status === 401 ? 'That password does not match this account. Try again.'
             : resp.status === 429 ? 'Too many attempts — wait a minute and try again.'
             : 'Sign-in failed just now. Please try again.';
           alertBox.classList.add('show');

@@ -69,6 +69,21 @@ def test_login_roundtrip_and_bad_password():
     assert client.get("/v1/me").status_code == 200
 
 
+def test_login_unknown_email_routes_to_signup():
+    r = client.post("/v1/auth/login", json={
+        "email": "ghost@nowhere.example", "password": "whatever 123"})
+    assert r.status_code == 404
+    assert r.json()["detail"]["error"] == "account_not_found"
+
+
+def test_login_google_account_told_to_use_google():
+    store.create_user("guser@example.com", "oauth$google", "")
+    r = client.post("/v1/auth/login", json={
+        "email": "guser@example.com", "password": "whatever 123"})
+    assert r.status_code == 401
+    assert r.json()["detail"]["error"] == "google_account"
+
+
 def test_me_requires_session():
     assert client.get("/v1/me").status_code == 401
 

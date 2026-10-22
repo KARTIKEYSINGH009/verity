@@ -424,9 +424,18 @@ async def auth_login(request: Request):
     email = str(body.get("email", "")).strip().lower()
     password = body.get("password", "")
     user = get_user_by_email(email)
-    stored = user["pw_hash"] if user else _DUMMY_PW_HASH
-    ok = isinstance(password, str) and _check_password(password, stored)
-    if not user or not ok:
+    # Product decision (Kartikey, 2026-10-22): the auth flow tells the
+    # user which side is wrong — unknown email routes to signup, an
+    # existing email routes to login — rather than a generic failure.
+    if not user:
+        raise HTTPException(status_code=404,
+                            detail={"error": "account_not_found"})
+    if not str(user["pw_hash"]).startswith("pbkdf2$"):
+        raise HTTPException(status_code=401,
+                            detail={"error": "google_account"})
+    ok = isinstance(password, str) and _check_password(password,
+                                                      user["pw_hash"])
+    if not ok:
         raise HTTPException(status_code=401,
                             detail={"error": "invalid_credentials"})
     return _start_session(request, {"user": _public_user(user)},
