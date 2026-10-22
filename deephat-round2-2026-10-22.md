@@ -126,3 +126,5 @@ company/email). Regression test: test_store_strips_nul_and_surrogates.
 Production battery result: 22/24 blocked, identical to local, with
 the new rules firing live (pii_fields_extract, embeddings_extract,
 exfil_link, prompt_extract_generic).
+Production re-verified after the fix: fuzz 35 probes, 0 crashes,
+0 unusual; battery 22/24 blocked (identical to local).
