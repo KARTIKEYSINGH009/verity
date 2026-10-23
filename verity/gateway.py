@@ -990,10 +990,26 @@ async def chat_completions(req: ChatRequest, request: Request,
     blocked_role: str | None = None
     for m in req.messages:
         v = screen(m.content)
+        eff = v
+        # Contextual release layer (2026-10-23): under its strict
+        # conditions it may release a discussion/transformation block.
+        # Releases are always trace-flagged; "shadow" records without
+        # applying, "on" applies, "off" skips entirely.
+        if config.CONTEXT_RELEASE_MODE != "off":
+            from .contextual import context_screen
+            cv = context_screen(m.content, base=v)
+            if cv.get("released"):
+                for f in ("context_released", f"ctx:{cv['context_class']}"):
+                    if f not in flags:
+                        flags.append(f)
+                if config.CONTEXT_RELEASE_MODE == "on":
+                    eff = cv
+            if cv.get("escalate") and "ctx:AMBIGUOUS" not in flags:
+                flags.append("ctx:AMBIGUOUS")
         for s in v["signals"]:
             if s not in flags:
                 flags.append(s)
-        if v["blocked"] and blocked_role is None:
+        if eff["blocked"] and blocked_role is None:
             blocked_role = m.role
         # Injection-judge escalation, SHADOW mode only (2026-10-23):
         # verdicts are recorded on the trace (case, verdict, confidence,
@@ -1005,7 +1021,7 @@ async def chat_completions(req: ChatRequest, request: Request,
             judge_fn = (lambda t: injection_judge(
                 t, timeout_s=config.INJECTION_JUDGE_TIMEOUT_S))
             shadow_flags = await asyncio.to_thread(
-                observe, m.content, v, judge_fn, "shadow")
+                observe, m.content, eff, judge_fn, "shadow")
             for f in shadow_flags:
                 if f not in flags:
                     flags.append(f)

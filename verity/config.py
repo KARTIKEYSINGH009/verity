@@ -51,6 +51,14 @@ try:
         os.getenv("VERITY_INJECTION_JUDGE_TIMEOUT_S", "3"))
 except ValueError:
     INJECTION_JUDGE_TIMEOUT_S = 3.0
+# Contextual release layer (2026-10-23): off | shadow | on. "on" lets the
+# context layer release discussion/transformation blocks under its strict
+# conditions; "shadow" computes and trace-flags releases without applying
+# them; "off" disables. Founder-approved live ("on") after the frozen-set
+# comparison beat the previous screen-only behaviour on every set.
+_raw_ctx_mode = os.getenv("VERITY_CONTEXT_RELEASE", "on").lower()
+CONTEXT_RELEASE_MODE = (_raw_ctx_mode if _raw_ctx_mode in
+                        ("off", "shadow", "on") else "on")
 # Admin key required to read /v1/traces. Empty (the default) disables the
 # traces endpoint entirely — the safe default for public deployments,
 # since traces contain raw prompts and answers.
