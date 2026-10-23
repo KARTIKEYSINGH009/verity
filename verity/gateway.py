@@ -995,6 +995,20 @@ async def chat_completions(req: ChatRequest, request: Request,
                 flags.append(s)
         if v["blocked"] and blocked_role is None:
             blocked_role = m.role
+        # Injection-judge escalation, SHADOW mode only (2026-10-23):
+        # verdicts are recorded on the trace (case, verdict, confidence,
+        # latency, errors, disagreements) and never change the outcome.
+        # Enforcement stays behind a separate approval gate — any other
+        # configured mode is treated as shadow here.
+        if config.INJECTION_JUDGE_MODE != "off":
+            from .escalation import injection_judge, observe
+            judge_fn = (lambda t: injection_judge(
+                t, timeout_s=config.INJECTION_JUDGE_TIMEOUT_S))
+            shadow_flags = await asyncio.to_thread(
+                observe, m.content, v, judge_fn, "shadow")
+            for f in shadow_flags:
+                if f not in flags:
+                    flags.append(f)
     if blocked_role is not None:
         flags.append(f"role:{blocked_role}")
     cid = _client_id(authorization)

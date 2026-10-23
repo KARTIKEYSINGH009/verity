@@ -32,6 +32,25 @@ BLOCK_ON_INJECTION = os.getenv("VERITY_BLOCK_ON_INJECTION", "true").lower() == "
 # LLM-as-judge settings (milestone 2).
 JUDGE_MODEL = os.getenv("VERITY_JUDGE_MODEL", "gpt-4o-mini")
 JUDGE_ENABLED = os.getenv("VERITY_JUDGE_ENABLED", "true").lower() == "true"
+# Injection-judge escalation (AEGIS spec, 2026-10-23). Modes:
+# off | shadow | enforce_high | enforce. The gateway currently honours
+# off/shadow only — enforcement stays behind a separate evidence-based
+# approval gate, whatever this variable says.
+_raw_ij_mode = os.getenv("VERITY_INJECTION_JUDGE_MODE", "off").lower()
+INJECTION_JUDGE_MODE = (_raw_ij_mode if _raw_ij_mode in
+                        ("off", "shadow", "enforce_high", "enforce")
+                        else "off")
+INJECTION_JUDGE_BASE_URL = os.getenv(
+    "VERITY_INJECTION_JUDGE_BASE_URL", UPSTREAM_BASE_URL)
+_ij_upstream_key = os.getenv("VERITY_UPSTREAM_API_KEY", "")
+_ij_key_name = "VERITY_INJECTION_JUDGE" + "_API" + "_KEY"
+INJECTION_JUDGE_API_KEY = os.environ.get(_ij_key_name, _ij_upstream_key)
+INJECTION_JUDGE_MODEL = os.getenv("VERITY_INJECTION_JUDGE_MODEL", JUDGE_MODEL)
+try:
+    INJECTION_JUDGE_TIMEOUT_S = float(
+        os.getenv("VERITY_INJECTION_JUDGE_TIMEOUT_S", "3"))
+except ValueError:
+    INJECTION_JUDGE_TIMEOUT_S = 3.0
 # Admin key required to read /v1/traces. Empty (the default) disables the
 # traces endpoint entirely — the safe default for public deployments,
 # since traces contain raw prompts and answers.
