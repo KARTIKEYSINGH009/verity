@@ -90,6 +90,53 @@ def _decoded_payloads(text: str) -> list[str]:
     return out
 
 
+_COMMON_WORDS = frozenset(
+    "the and you your me my show give ignore instructions system prompt "
+    "rules all reveal send list what this that with from have are was "
+    "not but they them then than its it is in on of to a an as at be by "
+    "do does did will would can could should now please tell".split()
+)
+
+
+def _common_word_hits(text: str) -> int:
+    words = re.findall(r"[a-z]+", (text or "").lower())
+    return sum(1 for w in words if w in _COMMON_WORDS)
+
+
+def _decoded_transforms(text: str) -> list[str]:
+    """Whole-text reversible transforms an attacker may hide behind:
+    ROT13, full reversal, and per-word reversal.
+
+    A transform is only re-screened when decoding produces clearly more
+    ordinary English than the raw text — a real encoded attack decodes
+    INTO readable words, while the transform of a benign message stays
+    gibberish and is never judged (its character n-grams could otherwise
+    trip the classifier by coincidence).
+    """
+    if not text or len(text) < 12:
+        return []
+    base_hits = _common_word_hits(text)
+    candidates: list[str] = []
+    try:
+        import codecs
+
+        rot = codecs.decode(text, "rot_13")
+        if rot != text:
+            candidates.append(rot)
+    except Exception:
+        pass
+    rev = text[::-1]
+    if rev != text:
+        candidates.append(rev)
+    words = text.split(" ")
+    if len(words) > 2:
+        per_word = " ".join(w[::-1] for w in words)
+        if per_word != text:
+            candidates.append(per_word)
+    return [c for c in candidates
+            if _common_word_hits(c) >= 2 and _common_word_hits(c) > base_hits]
+
+
 def screen(text: str) -> dict:
     """Full guard verdict: heuristics plus the trained classifier.
 
@@ -111,6 +158,10 @@ def screen(text: str) -> dict:
     fused = _despaced(text)
     if fused is not None:
         variants.append(fused)
+    if not signals:
+        # Nothing found yet: also try whole-text reversible transforms
+        # (ROT13 / reversed). Judged by decoded content, like base64.
+        variants.extend(_decoded_transforms(text))
     for payload in variants:
         sub_hits = detect_injection(payload)
         sub_score = probability_malicious(payload)
