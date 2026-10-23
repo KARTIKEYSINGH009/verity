@@ -1,16 +1,16 @@
 {
   "meta": {
-    "generated_at": "2026-10-23T09:01:41.298847+00:00",
+    "generated_at": "2026-10-23T10:54:32.523487+00:00",
     "classifier": "naive-bayes word(1,2)+char(3,4) n-grams, normalized input",
     "threshold": 0.75,
     "train_examples": 568,
     "validation_examples": 16,
     "test_examples": 45,
     "latency_ms": {
-      "p50": 0.57,
-      "p95": 1.24,
-      "p99": 53.69,
-      "mean": 1.79
+      "p50": 0.61,
+      "p95": 1.45,
+      "p99": 98.76,
+      "mean": 2.9
     }
   },
   "dataset": {
@@ -233,7 +233,7 @@
       "accuracy": 1.0
     }
   },
-  "avg_screen_latency_ms_local": 1.79,
+  "avg_screen_latency_ms_local": 2.9,
   "faithfulness_heuristic": {
     "cases": 8,
     "verdict_accuracy": 0.75,
