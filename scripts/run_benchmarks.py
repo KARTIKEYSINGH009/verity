@@ -1,10 +1,13 @@
 """Run the held-out benchmark and publish the results (audit response).
 
-Measures the guard three ways on scripts/eval_set.py — examples disjoint
+Measures the guard four ways on scripts/eval_set.py — examples disjoint
 from all training data:
   * rules_only       heuristic patterns alone
   * classifier_only  trained model alone (threshold 0.75)
   * combined         the production screen() verdict
+  * gateway          the full gateway decision: screen() plus the
+                     contextual release layer (discussion/transformation
+                     releases under strict conditions, 2026-10-23)
 
 Reports recall, precision, false-positive rate, per-category recall for
 the combined mode, and average screening latency. Writes the results to
@@ -25,6 +28,7 @@ from eval_set import EVAL_SET  # noqa: E402
 from injection_dataset import DATASET  # noqa: E402
 from train_injection_classifier import load_corrections  # noqa: E402
 
+from verity.contextual import context_screen  # noqa: E402
 from verity.guard import CLASSIFIER_THRESHOLD, detect_injection, screen  # noqa: E402
 from verity.injection_classifier import probability_malicious  # noqa: E402
 from verity.scoring import faithfulness_score  # noqa: E402
@@ -86,7 +90,8 @@ if __name__ == "__main__":
     overlap = [t for t, _, _ in EVAL_SET if t.strip().lower() in trained]
     assert not overlap, f"eval examples leaked into training: {overlap}"
 
-    modes = {"rules_only": [], "classifier_only": [], "combined": []}
+    modes = {"rules_only": [], "classifier_only": [], "combined": [],
+             "gateway": []}
     per_category: dict[str, list[tuple[bool, bool]]] = defaultdict(list)
     latencies = []
     misses, false_alarms = [], []
@@ -105,6 +110,8 @@ if __name__ == "__main__":
         modes["rules_only"].append((rules_hit, actual))
         modes["classifier_only"].append((clf_hit, actual))
         modes["combined"].append((combined, actual))
+        modes["gateway"].append(
+            (context_screen(text, base=verdict)["blocked"], actual))
         per_category[category].append((combined, actual))
         if actual and not combined:
             misses.append({"text": text, "category": category})
@@ -197,8 +204,10 @@ if __name__ == "__main__":
         "methodology": "Rules = verity.guard.detect_injection; classifier = "
                        "Naive Bayes (word + char n-grams) at threshold "
                        f"{CLASSIFIER_THRESHOLD}; combined = production "
-                       "screen() verdict. Latency measured locally, "
-                       "screening only (excludes model provider call).",
+                       "screen() verdict; gateway = screen() plus the "
+                       "contextual release layer (the live gateway "
+                       "decision). Latency measured locally, screening "
+                       "only (excludes model provider call).",
     }
     with open(OUT_PATH, "w", encoding="utf-8") as fh:
         json.dump(results, fh, indent=2)

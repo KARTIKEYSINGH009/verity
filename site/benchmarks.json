@@ -1,16 +1,16 @@
 {
   "meta": {
-    "generated_at": "2026-10-23T10:54:32.523487+00:00",
+    "generated_at": "2026-10-23T11:33:08.326359+00:00",
     "classifier": "naive-bayes word(1,2)+char(3,4) n-grams, normalized input",
     "threshold": 0.75,
     "train_examples": 568,
     "validation_examples": 16,
     "test_examples": 45,
     "latency_ms": {
-      "p50": 0.61,
-      "p95": 1.45,
-      "p99": 98.76,
-      "mean": 2.9
+      "p50": 0.7,
+      "p95": 3.68,
+      "p99": 164.86,
+      "mean": 5.0
     }
   },
   "dataset": {
@@ -53,6 +53,17 @@
       "f1": 0.92,
       "false_positive_rate": 0.1,
       "accuracy": 0.911
+    },
+    "gateway": {
+      "tp": 23,
+      "fp": 1,
+      "fn": 2,
+      "tn": 19,
+      "recall": 0.92,
+      "precision": 0.958,
+      "f1": 0.939,
+      "false_positive_rate": 0.05,
+      "accuracy": 0.933
     }
   },
   "combined_per_category": {
@@ -233,7 +244,7 @@
       "accuracy": 1.0
     }
   },
-  "avg_screen_latency_ms_local": 2.9,
+  "avg_screen_latency_ms_local": 5.0,
   "faithfulness_heuristic": {
     "cases": 8,
     "verdict_accuracy": 0.75,
@@ -267,5 +278,5 @@
       ]
     }
   ],
-  "methodology": "Rules = verity.guard.detect_injection; classifier = Naive Bayes (word + char n-grams) at threshold 0.75; combined = production screen() verdict. Latency measured locally, screening only (excludes model provider call)."
+  "methodology": "Rules = verity.guard.detect_injection; classifier = Naive Bayes (word + char n-grams) at threshold 0.75; combined = production screen() verdict; gateway = screen() plus the contextual release layer (the live gateway decision). Latency measured locally, screening only (excludes model provider call)."
 }
