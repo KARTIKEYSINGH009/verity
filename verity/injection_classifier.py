@@ -23,6 +23,25 @@ import unicodedata
 
 CLASSES = ("malicious", "benign")
 _TOKEN = re.compile(r"[a-z]+")
+def _word_tokens(t: str) -> list[str]:
+    """Word tokens as maximal runs of Unicode letters/marks (categories
+    L*/M*). Unlike the old [a-z]+ regex, non-Latin scripts (Devanagari,
+    Arabic, CJK, ...) produce whole-word features instead of none, so the
+    classifier can learn from training data in those scripts. Plain
+    English tokenizes identically to the old regex."""
+    out: list[str] = []
+    cur: list[str] = []
+    for ch in t:
+        if unicodedata.category(ch)[0] in ("L", "M"):
+            cur.append(ch)
+        elif cur:
+            out.append("".join(cur))
+            cur = []
+    if cur:
+        out.append("".join(cur))
+    return out
+
+
 _MODEL_PATH = os.path.join(os.path.dirname(__file__), "data", "injection_model.json")
 
 _CONTRACTIONS = {
@@ -79,7 +98,7 @@ def normalize(text: str) -> str:
 
 def features(text: str) -> list[str]:
     t = normalize(text)
-    words = _TOKEN.findall(t)
+    words = _word_tokens(t)
     grams = list(words)
     grams += [f"{a} {b}" for a, b in zip(words, words[1:])]
     padded = f"  {t}  "
@@ -233,11 +252,15 @@ def _load_with_sibling(path: str) -> dict | None:
 
 def save_model(model: dict, path: str) -> None:
     """Write weights in the compact array format (rounded floats), split
-    across the main file and _part2/_part3 siblings so each file stays
-    under the connector push cap."""
+    across the main file and as many _partN siblings as needed so each
+    file stays under a byte budget (the connector push cap). The loader
+    merges parts in order until one is missing, so any count works.
+    Stale part files beyond the new count are removed."""
+    import glob as _glob
+
+    TARGET_BYTES = 100_000
     fmt = _to_file_format(model)
     n = len(fmt["vocab"])
-    third = (n + 2) // 3
 
     def part(idxs: list[int]) -> dict:
         return {
@@ -252,11 +275,26 @@ def save_model(model: dict, path: str) -> None:
             "log_prob_oov": fmt["log_prob_oov"],
         }
 
+    def part_path(k: int) -> str:
+        return path if k == 1 else path[:-5] + f"_part{k}.json"
+
+    # Estimate a chunk size from the average serialized bytes per feature,
+    # then shrink until every part fits the budget.
+    total_est = sum(len(f) for f in fmt["vocab"]) + 24 * n + 512
+    chunk = max(1, int(n * TARGET_BYTES / max(total_est, 1)))
+    while True:
+        chunks = [list(range(i, min(i + chunk, n))) for i in range(0, n, chunk)]
+        if all(len(json.dumps(part(c))) <= 110_000 for c in chunks):
+            break
+        chunk = max(1, chunk // 2)
+
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as fh:
-        json.dump(part(list(range(0, third))), fh)
-    with open(_sibling_path(path), "w", encoding="utf-8") as fh:
-        json.dump(part(list(range(third, 2 * third))), fh)
-    part3 = path[:-5] + "_part3.json" if path.endswith(".json") else path
-    with open(part3, "w", encoding="utf-8") as fh:
-        json.dump(part(list(range(2 * third, n))), fh)
+    for k, idxs in enumerate(chunks, start=1):
+        with open(part_path(k), "w", encoding="utf-8") as fh:
+            json.dump(part(idxs), fh)
+    # Remove stale siblings from an earlier, larger split.
+    if path.endswith(".json"):
+        for stale in _glob.glob(path[:-5] + "_part*.json"):
+            num = stale[len(path[:-5] + "_part"):-len(".json")]
+            if num.isdigit() and int(num) > len(chunks):
+                os.remove(stale)
