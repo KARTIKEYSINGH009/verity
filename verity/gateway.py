@@ -123,6 +123,19 @@ async def _security_headers(request: Request, call_next):
 
 
 @app.middleware("http")
+async def _no_store_html(request: Request, call_next):
+    """Never let a browser keep a stale HTML page.
+
+    Pages (homepage, pilot, playground, docs) must always be fresh:
+    a cached copy can show outdated wording after a deploy. Assets
+    (CSS/JS/images) and API JSON are untouched."""
+    response = await call_next(request)
+    if response.headers.get("content-type", "").startswith("text/html"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.middleware("http")
 async def _body_size_limit(request: Request, call_next):
     """Reject oversized bodies before any JSON parsing happens
     (audit batch 2, finding 4). The per-field character caps run after
