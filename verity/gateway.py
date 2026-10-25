@@ -25,7 +25,7 @@ from .judge import judge_faithfulness
 from .policy import check_request as policy_check_request
 from .policy import check_response as policy_check_response
 from .scoring import faithfulness_score
-from .store import (DuplicateEmail, active_api_key, claim_auth_token,
+from .store import (DuplicateEmail, _db_text, active_api_key, claim_auth_token,
                     create_session, create_user, delete_session,
                     delete_user_sessions, find_api_key, get_auth_token,
                     get_email_verified, get_marketing_state,
@@ -966,6 +966,18 @@ async def chat_completions(req: ChatRequest, request: Request,
                                 detail={"error": "rate_limited"})
     _enforce_free_quota(authorization)
     _enforce_email_verified(authorization)
+    # Pentest F-01 (2026-10-23): a lone Unicode surrogate in chat content
+    # crashed the endpoint with a 500 — the mock answer echoes user text
+    # and Starlette's UTF-8 response encoding rejects lone surrogates.
+    # Sanitize every user-supplied text field at this boundary, before
+    # screening, policy checks, the model call, and the response, using
+    # the same helper that already protects trace logging in store.py
+    # (strips NUL, replaces lone surrogates with U+FFFD).
+    for m in req.messages:
+        m.content = _db_text(m.content)
+    req.model = _db_text(req.model)
+    req.policy_context = _db_text(req.policy_context)
+    req.grounding_context = _db_text(req.grounding_context)
     combined = "\n".join(m.content for m in req.messages)
     if len(combined) > config.MAX_INPUT_CHARS:
         raise HTTPException(status_code=413, detail={
@@ -1057,7 +1069,11 @@ async def chat_completions(req: ChatRequest, request: Request,
     # Tool-call completions carry content=None per the OpenAI spec
     # (audit #20) — coerce defensively instead of 500ing downstream.
     _msg = (result.get("choices") or [{}])[0].get("message") or {}
-    answer = _msg.get("content") or ""
+    # Pentest F-01: an upstream answer could also carry a lone surrogate,
+    # so sanitize the answer before it is returned to the caller.
+    answer = _db_text(_msg.get("content") or "")
+    if "content" in _msg:
+        _msg["content"] = answer
 
     # 2b. Policy guard (response side): even if the model complied with a
     # prohibited action, its answer never reaches the user.

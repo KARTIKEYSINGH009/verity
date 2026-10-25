@@ -52,6 +52,16 @@ CASES = [
     ("chat: null bytes + RTL + ZWSP", "POST", CHAT,
      {"json": {"model": "mock", "messages": [
          {"role": "user", "content": "a\u0000b\u202ec\u200bd"}]}}),
+    # Pentest F-01 (2026-10-23): lone surrogate must never 500.
+    ("chat: lone surrogate JSON escape", "POST", CHAT,
+     {"json": {"model": "mock", "messages": [
+         {"role": "user", "content": "bad \ud800 surrogate"}]}}),
+    ("chat: lone surrogate raw bytes", "POST", CHAT,
+     {"content": (b'{"model":"mock","messages":[{"role":"user",'
+                 b'"content":"bad '
+                 + chr(0xD800).encode("utf-8", "surrogatepass")
+                 + b' surrogate"}]}'),
+      "headers": {"Content-Type": "application/json"}}),
     ("chat: emoji flood x5000", "POST", CHAT,
      {"json": {"model": "mock", "messages": [
          {"role": "user", "content": "🙂" * 5000}]}}),
