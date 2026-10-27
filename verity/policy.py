@@ -93,12 +93,152 @@ def _prohibited_actions(policy: str) -> list[str]:
     return [a for a, rx in _FORBIDDEN.items() if rx.search(policy or "")]
 
 
+# ---------------------------------------------------------------------------
+# Conditional rules (P1/P2 strengthening, 2026-10-27).
+#
+# The absolute-prohibition layer above only fires when a policy forbids an
+# action outright. Real bypasses don't ask for the forbidden thing plainly:
+# they ask for it *outside the stated terms* (refund after the window),
+# *to the wrong destination* (a third party's account), *stacked or above
+# the stated cap* (discounts), or *without the required check* (skip
+# verification). Fraud patterns add claimed authority, coercion, payout
+# via a non-standard instrument, and account-recovery redirection.
+#
+# Design rules for this layer (each rule has a genuine twin that must pass):
+# 1. Deterministic patterns only — no judge, no classifier, works in mock.
+# 2. A rule fires only on its own narrow evidence (stated age, named third
+#    party, second discount instrument, explicit skip verb, ...). Vague
+#    unhappiness, a single legitimate discount, or asking *for*
+#    verification never fires.
+# 3. Absolute prohibitions still run first, so no existing flow changes.
+# 4. No rule fires without a policy: check_request is only called by the
+#    gateway when policy_context is non-empty.
+# ---------------------------------------------------------------------------
+_MONEY = re.compile(r"\b(refund|money back|payout|reimburse)\b", re.IGNORECASE)
+_WINDOW_RX = re.compile(
+    r"within\s+(\d+)\s+days?|(\d+)[- ]day\s+(refund|return|exchange)|"
+    r"refunds?\s+allowed\s+for\s+(\d+)\s+days?",
+    re.IGNORECASE)
+_AGE_RX = re.compile(
+    r"(\d+)\s*(day|week|month|year)s?\s+ago|\blast\s+(year|month|week)\b",
+    re.IGNORECASE)
+_AGE_DAYS = {"day": 1, "week": 7, "month": 30, "year": 365}
+_THIRD_PARTY_RX = re.compile(
+    r"(friend'?s|someone else'?s|another person'?s|third part\w*|"
+    r"other person'?s)\s+(account|paypal|card|bank|wallet)",
+    re.IGNORECASE)
+_NONSTANDARD_RX = re.compile(r"\b(gift cards?|crypto|bitcoin|wire transfer)\b",
+                             re.IGNORECASE)
+_INSTRUMENT_RX = [
+    re.compile(r"\bcoupon\b|\bpromo code\b", re.IGNORECASE),
+    re.compile(r"\d+\s*%\s*off\b", re.IGNORECASE),
+    re.compile(r"\bfree\s+(item|product|replacement|unit)\b", re.IGNORECASE),
+    re.compile(r"\bbuy one get one\b|\bbogo\b", re.IGNORECASE),
+]
+_CAP_RX = re.compile(r"up to\s+(\d+)\s*%", re.IGNORECASE)
+_PCT_RX = re.compile(r"(\d+)\s*%\s*off", re.IGNORECASE)
+_SKIP_VERB_RX = re.compile(
+    r"\b(skip|bypass|waive|avoid)\b|"
+    r"(don't|dont|do not)\s+make me\b|do not ask me for\b",
+    re.IGNORECASE)
+_SKIP_NOUN_RX = re.compile(
+    r"\b(verif\w*|otp|one[- ]time password|id check|id proof|"
+    r"security questions?|approval)\b",
+    re.IGNORECASE)
+_AUTHORITY_RX = re.compile(
+    r"\bi am (the )?(store manager|manager|ceo|owner|admin|"
+    r"administrator|boss)\b",
+    re.IGNORECASE)
+_THREAT_RX = re.compile(
+    r"\b(sue|chargeback|go public|bad review|lawyer)\b",
+    re.IGNORECASE)
+
+
+def _window_days(policy: str) -> int | None:
+    m = _WINDOW_RX.search(policy or "")
+    if not m:
+        return None
+    for g in m.groups():
+        if g and g.isdigit():
+            return int(g)
+    return None
+
+
+def _age_days(text: str) -> int | None:
+    m = _AGE_RX.search(text or "")
+    if not m:
+        return None
+    if m.group(1):
+        return int(m.group(1)) * _AGE_DAYS[m.group(2)]
+    return {"day": 1, "week": 7, "month": 30, "year": 365}[m.group(3)]
+
+
+def _conditional_block(policy: str, text: str) -> dict | None:
+    """One conditional-rule hit, or None. Absolute prohibitions already ran."""
+    t = text or ""
+
+    window = _window_days(policy)
+    if window is not None and _MONEY.search(t):
+        age = _age_days(t)
+        if age is not None and age > window:
+            return {"blocked": True, "action": "refund",
+                    "method": "policy_rule",
+                    "reason": "refund requested outside the policy window"}
+    if _MONEY.search(t) and _THIRD_PARTY_RX.search(t):
+        return {"blocked": True, "action": "refund",
+                "method": "policy_rule",
+                "reason": "refund to a third-party destination"}
+    if _MONEY.search(t) and _NONSTANDARD_RX.search(t):
+        return {"blocked": True, "action": "refund",
+                "method": "policy_rule",
+                "reason": "refund via a non-standard instrument"}
+    instruments = sum(1 for rx in _INSTRUMENT_RX if rx.search(t))
+    if instruments >= 2:
+        return {"blocked": True, "action": "discount",
+                "method": "policy_rule",
+                "reason": "stacked discounts requested in one request"}
+    cap = _CAP_RX.search(policy or "")
+    pct = _PCT_RX.search(t)
+    if cap and pct and int(pct.group(1)) > int(cap.group(1)):
+        return {"blocked": True, "action": "discount",
+                "method": "policy_rule",
+                "reason": "discount above the policy cap"}
+    if not re.search(r"already\s+verif", t, re.IGNORECASE):
+        if (_SKIP_VERB_RX.search(t) and _SKIP_NOUN_RX.search(t)) or \
+                re.search(r"without\s+(verif\w*|otp)", t, re.IGNORECASE):
+            return {"blocked": True, "action": "refund",
+                    "method": "policy_rule",
+                    "reason": "skip verification requested"}
+    if _MONEY.search(t) and _AUTHORITY_RX.search(t):
+        return {"blocked": True, "action": "refund",
+                "method": "policy_rule",
+                "reason": "payout on claimed authority"}
+    if _MONEY.search(t) and _THREAT_RX.search(t):
+        return {"blocked": True, "action": "refund",
+                "method": "policy_rule",
+                "reason": "coerced payout"}
+    if re.search(r"\b(change|update)\b", t, re.IGNORECASE) and \
+            re.search(r"\b(email|phone)\b", t, re.IGNORECASE) and \
+            re.search(r"\bsend\b", t, re.IGNORECASE) and \
+            re.search(r"\b(reset code|code|otp)\b", t, re.IGNORECASE) and \
+            re.search(r"\bnew\s+(address|email|phone|number)\b", t,
+                      re.IGNORECASE):
+        return {"blocked": True, "action": "privilege_grant",
+                "method": "policy_rule",
+                "reason": "account recovery redirected"}
+    return None
+
+
 def check_request(policy: str, user_text: str) -> dict:
-    """Block requests that seek an absolutely-prohibited action."""
+    """Block requests that seek an absolutely-prohibited action, or a
+    conditional bypass of the policy's stated terms."""
     for action in _prohibited_actions(policy):
         if _ACTIONS[action].search(user_text or ""):
             return {"blocked": True, "action": action, "method": "policy_rule",
                     "reason": f"policy prohibits {action} requests outright"}
+    hit = _conditional_block(policy, user_text)
+    if hit:
+        return hit
     return {"blocked": False, "action": None, "method": "policy_rule",
             "reason": ""}
 
