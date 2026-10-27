@@ -3,3 +3,4 @@ __pycache__/
 .venv/
 verity.db
 .env
+redteam_runs/
