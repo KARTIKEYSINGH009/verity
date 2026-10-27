@@ -59,6 +59,15 @@ except ValueError:
 _raw_ctx_mode = os.getenv("VERITY_CONTEXT_RELEASE", "on").lower()
 CONTEXT_RELEASE_MODE = (_raw_ctx_mode if _raw_ctx_mode in
                         ("off", "shadow", "on") else "on")
+# Staged judge authority (AEGIS restructure, 2026-10-27, local build).
+# off (default) | enforce_high. "enforce_high" lets a shadow judge
+# verdict of attack at confidence >= 0.90 block an escalated case.
+# Production enforcement needs the 2026-10-25 evidence gate first
+# (shadow FA <= 5%, catch >= 80%, error < 2%, readable traces); until
+# that evidence exists this stays "off" and changes nothing.
+_raw_judge_auth = os.getenv("VERITY_JUDGE_AUTHORITY_MODE", "off").lower()
+JUDGE_AUTHORITY_MODE = (_raw_judge_auth if _raw_judge_auth in
+                        ("off", "enforce_high") else "off")
 # Admin key required to read /v1/traces. Empty (the default) disables the
 # traces endpoint entirely — the safe default for public deployments,
 # since traces contain raw prompts and answers.

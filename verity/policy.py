@@ -151,12 +151,47 @@ def _judge_response(policy: str, answer: str) -> dict | None:
         return None
 
 
+
+# Response-side baseline (AEGIS restructure, 2026-10-27): performed
+# bypasses that never reach the user, with or without a client policy.
+_RESPONSE_CONDITIONAL = [
+    ("verification_skip",
+     re.compile(r"verif\w*\s+(has\s+been\s+)?(waived|skipped|bypassed)|"
+                r"no\s+verification\s+(needed|required)",
+                re.IGNORECASE),
+     "response waives verification"),
+    ("discount",
+     re.compile(r"applied\s+both\b|combined\s+(discounts|coupons)|"
+                r"stacked\s+(discounts|coupons)",
+                re.IGNORECASE),
+     "response performs stacked discounts"),
+    ("refund",
+     re.compile(r"refund\s+(has\s+been\s+)?sent\s+to\s+(a\s+)?"
+                r"(different|another|other)\s+(account|person)",
+                re.IGNORECASE),
+     "response sends a refund to a different destination"),
+]
+
+
+def check_baseline_response(answer: str) -> dict:
+    """Baseline response policy, always on (AEGIS restructure, 2026-10-27)."""
+    for action, rx, reason in _RESPONSE_CONDITIONAL:
+        if rx.search(answer or ""):
+            return {"violates": True, "action": action, "method": "policy_rule",
+                    "reason": reason}
+    return {"violates": False, "action": None, "method": "policy_rule",
+            "reason": ""}
+
 def check_response(policy: str, answer: str) -> dict:
     """Block answers that perform a prohibited action."""
     for action in _prohibited_actions(policy):
         if _PERFORMED[action].search(answer or ""):
             return {"violates": True, "action": action, "method": "policy_rule",
                     "reason": f"response performs a prohibited {action}"}
+    for action, rx, reason in _RESPONSE_CONDITIONAL:
+        if rx.search(answer or ""):
+            return {"violates": True, "action": action, "method": "policy_rule",
+                    "reason": reason}
     if not config.MOCK_MODE and config.UPSTREAM_API_KEY:
         judged = _judge_response(policy, answer)
         if judged is None:

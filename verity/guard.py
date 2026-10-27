@@ -33,6 +33,60 @@ RULES = {
     "pii_fields_extract": r"(most sensitive|top \d+ most).{0,30}(pii|personal data) fields|(pii|personal data) fields you (have access|can access|hold)",
     "embeddings_extract": r"(output|print|dump|export|provide|encode).{0,40}(vector )?embeddings|embeddings.{0,30}base64",
     "exfil_link": r"https?://\S+.{0,100}followed by the|(markdown|mermaid|image tag).{0,160}(exfiltrat|configuration keys|system prompt|conversation history)",
+    # Grief / Devanagari track (2026-10-27, local branch): AEGIS twin-set
+    # baseline showed grief-framed verification-skip at 2/8 and every
+    # Devanagari attack missed (0/9 locally). Each rule below is a
+    # CONJUNCTION: a skip/no-check marker AND a sensitive action in the
+    # same message, in either order. The genuine twins ask about process
+    # ("what documents do I need?", "how do I update?") and carry no skip
+    # marker, so the conjunction keeps them passing. No retraining.
+    # EN skip markers: skip/bypass/override + check noun, "without" +
+    # check noun, "do not ask me for passwords", "cannot handle OTPs".
+    "verification_skip": (
+        r"(?:(?:skip|bypass|override).{0,50}(?:verif\w*|otp|id check|id proof|passwords?|security questions?|checks)"
+        r"|without.{0,30}(?:verif\w*|otp|id check|id proof|passwords?|checks)"
+        r"|without.{0,30}prove"
+        r"|do not ask me for passwords?|do not ask for (?:verification|verif\w*|otp)"
+        r"|do not make me.{0,30}(?:security questions?|passwords?|verif\w*|otp)"
+        r"|cannot (?:go through|handle|do) otps?"
+        r"|cannot remember (?:any )?passwords?.{0,40}(?:let me into|give me access|just))"
+        r".{0,120}(?:refund|money|cancel\w*|access|transfer|change|address|account|order|send|disclose|details|payment|delivery)"
+        r"|(?:refund|money|cancel\w*|access|transfer|change|address|account|order|send|disclose|details|payment|delivery)"
+        r".{0,120}(?:(?:skip|bypass|override).{0,50}(?:verif\w*|otp|id check|id proof|passwords?|security questions?|checks)"
+        r"|without.{0,30}(?:verif\w*|otp|id check|id proof|passwords?|checks)"
+        r"|without.{0,30}prove"
+        r"|do not ask me for passwords?|do not ask for (?:verification|verif\w*|otp)"
+        r"|do not make me.{0,30}(?:security questions?|passwords?|verif\w*|otp)"
+        r"|cannot (?:go through|handle|do) otps?"
+        r"|cannot remember (?:any )?passwords?.{0,40}(?:let me into|give me access|just))"
+    ),
+    # Hinglish (Roman Hindi) skip markers.
+    "verification_skip_hinglish": (
+        r"(?:(?:verification|otp|jaanch)\s+mat\s+(?:maango|mango|poochho|puchho)"
+        r"|verification\s+skip\s+kar\w*|verification\s+ka\s+time\s+nahi"
+        r"|verification\s+ke\s+liye\s+mat\s+(?:ruko|rukna)"
+        r"|bina\s+(?:verification|otp|jaanch))"
+        r".{0,120}(?:refund|account|bhej|order|address|details)"
+        r"|(?:refund|account|bhej|order|address|details)"
+        r".{0,120}(?:(?:verification|otp|jaanch)\s+mat\s+(?:maango|mango|poochho|puchho)"
+        r"|verification\s+skip\s+kar\w*|verification\s+ka\s+time\s+nahi"
+        r"|verification\s+ke\s+liye\s+mat\s+(?:ruko|rukna)"
+        r"|bina\s+(?:verification|otp|jaanch))"
+    ),
+    # Devanagari skip markers: बिना (जाँच/सत्यापन/ओटीपी), जाँच किए बिना.
+    "verification_skip_deva": (
+        r"(?:बिना\s+(?:किसी\s+(?:और\s+)?)?(?:जाँच|सत्यापन|ओटीपी)|जाँच\s+किए\s+बिना|बिना\s+जाँच\s+के|जाँच\s+मत\s+(?:कीजिए|करो))"
+        r".{0,120}(?:रद्द|पैसा|रिफंड|खाता|पता|ऑर्डर|भेज|बता|नंबर)"
+        r"|(?:रद्द|पैसा|रिफंड|खाता|पता|ऑर्डर|भेज|बता|नंबर)"
+        r".{0,120}(?:बिना\s+(?:किसी\s+(?:और\s+)?)?(?:जाँच|सत्यापन|ओटीपी)|जाँच\s+किए\s+बिना|बिना\s+जाँच\s+के|जाँच\s+मत\s+(?:कीजिए|करो))"
+    ),
+    # Devanagari family rules (same twin logic: twins ask process questions).
+    "deva_authority": r"मैं\s+(?:पुलिस|मैनेजर|बैंक)\s+से\s+बोल|मैं\s+क्षेत्रीय\s+प्रबंधक\s+बोल|मैनेजर\s+ने\s+.{0,30}(?:अनुमति|बोला|कहा)",
+    "deva_others_data": r"(?:पिछले\s+ग्राहक|किसी\s+और|भाई|बहन).{0,60}(?:फोन\s+नंबर|पता|ऑर्डर).{0,40}(?:बता|दीजिए)|उनका\s+.{0,30}(?:फोन\s+नंबर|पता|ऑर्डर).{0,20}(?:बता|दीजिए)|पिछले\s+(?:दस\s+)?ग्राहकों?\s+के\s+ऑर्डर.{0,20}(?:जारी|बता|दीजिए)",
+    "deva_takeover": r"(?:रजिस्टर्ड\s+)?(?:नंबर|ईमेल|पासवर्ड)\s+बदल\w*.{0,50}(?:नया|भेज|लिंक)|पासवर्ड\s+रीसेट.{0,40}(?:नए|नया|भेज|लिंक)",
+    "deva_threat": r"कानूनी\s+कार्रवाई.{0,30}(?:करूँगा|करूंगा)",
+    "deva_prompt_extract": r"(?:छिपे\s+हुए|गुप्त)\s*(?:निर्देश|नियम).{0,40}(?:बता|शब्दशः)",
+    "deva_refund_redirect": r"(?:भाई|दोस्त|दूसरे)\s+.{0,20}खाते\s+में\s+भेज",
 }
 
 _COMPILED = {name: re.compile(pat, re.IGNORECASE) for name, pat in RULES.items()}

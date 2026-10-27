@@ -20,8 +20,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from . import config, mailer
+from .action_check import check_actions, unknown_language_risky
+from .cleaner import sanitize
 from .guard import screen
 from .judge import judge_faithfulness
+from .judge_authority import decision_from_flags
+from .language import detect_language
+from .policy import check_baseline_response as baseline_check_response
 from .policy import check_request as policy_check_request
 from .policy import check_response as policy_check_response
 from .scoring import faithfulness_score
@@ -1013,6 +1018,13 @@ async def chat_completions(req: ChatRequest, request: Request,
     # trace shows where the attack rode in.
     flags: list[str] = []
     blocked_role: str | None = None
+    # AEGIS restructure (2026-10-27, local): cleaner -> language -> guard
+    # -> action check -> context release -> policy (baseline + client) ->
+    # judge authority (staged) -> model -> response policy. The cleaner
+    # prepares the text the safety layers judge; model input is unchanged.
+    cleaned = sanitize(combined)
+    lang = detect_language(cleaned)
+    flags.append(f"lang:{lang}")
     for m in req.messages:
         v = screen(m.content)
         eff = v
@@ -1059,8 +1071,30 @@ async def chat_completions(req: ChatRequest, request: Request,
         raise HTTPException(status_code=400, detail={
             "error": "blocked_by_verity_guard", "matched_rules": flags})
 
-    # 1b. Policy guard (request side): stop requests seeking an action the
-    # business policy prohibits outright, before the model can comply.
+    # 1a. Baseline policy (AEGIS restructure): the action check runs on
+    # every request, no client policy needed. The context-release layer
+    # above applies to guard blocks only — it never releases a baseline
+    # policy block, because a discussion frame does not authorize moving
+    # money, disclosing others' data, or skipping verification.
+    act = check_actions(cleaned)
+    for a in act["actions"]:
+        if f"action:{a}" not in flags:
+            flags.append(f"action:{a}")
+    if not act["blocked"] and unknown_language_risky(cleaned, lang):
+        act = {"blocked": True, "actions": ["unknown_language_risky"],
+               "reason": "unknown language with a script-independent "
+                         "risky indicator; fail-closed",
+               "language": lang}
+        flags.append("action:unknown_language_risky")
+    if act["blocked"]:
+        log_trace(req.model, combined, "", 0.0, blocked=True, flags=flags,
+                  client_id=cid)
+        raise HTTPException(status_code=400, detail={
+            "error": "blocked_by_verity_action",
+            "action": act["actions"], "reason": act["reason"]})
+
+    # 1b. Policy guard (request side): client policy adds on top of the
+    # baseline above; it never subtracts from it.
     if req.policy_context:
         pol = policy_check_request(req.policy_context, combined)
         if pol["blocked"]:
@@ -1070,6 +1104,18 @@ async def chat_completions(req: ChatRequest, request: Request,
             raise HTTPException(status_code=400, detail={
                 "error": "blocked_by_verity_policy",
                 "action": pol["action"], "reason": pol["reason"]})
+
+    # 1c. Staged judge authority (AEGIS restructure): enforce_high only,
+    # reusing the shadow verdict already computed above — no new judge
+    # call. Default mode is "off": with it off this step changes nothing.
+    auth = decision_from_flags(flags, config.JUDGE_AUTHORITY_MODE)
+    if auth["blocked"]:
+        jflags = list(flags) + ["judge_authority:enforce_high"]
+        log_trace(req.model, combined, "", 0.0, blocked=True, flags=jflags,
+                  client_id=cid)
+        raise HTTPException(status_code=400, detail={
+            "error": "blocked_by_verity_judge",
+            "stage": auth["stage"], "reason": auth["reason"]})
 
     # 2. Get the completion (mock or real upstream).
     if config.MOCK_MODE:
@@ -1088,8 +1134,20 @@ async def chat_completions(req: ChatRequest, request: Request,
     if "content" in _msg:
         _msg["content"] = answer
 
-    # 2b. Policy guard (response side): even if the model complied with a
-    # prohibited action, its answer never reaches the user.
+    # 2b. Policy guard (response side): baseline first, always — a
+    # performed bypass (verification waived, stacked discounts, refund
+    # sent elsewhere) never reaches the user, with or without a client
+    # policy. Client policy adds on top, as on the request side.
+    baseline_result = baseline_check_response(answer)
+    if baseline_result["violates"]:
+        bflags = list(flags) + ["policy_violation"]
+        latency_ms = (time.perf_counter() - started) * 1000
+        log_trace(req.model, combined, answer, latency_ms, blocked=True,
+                  flags=bflags, client_id=cid)
+        raise HTTPException(status_code=400, detail={
+            "error": "policy_violation_in_response",
+            "action": baseline_result.get("action"),
+            "reason": baseline_result.get("reason", "")})
     policy_result = None
     if req.policy_context:
         policy_result = await asyncio.to_thread(
