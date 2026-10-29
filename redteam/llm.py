@@ -52,7 +52,7 @@ def env_chat_fn():
     """Build a chat_fn(model, messages) -> str from the environment."""
     base_url = os.environ.get("REDTEAM_BASE_URL",
                               "https://api.groq.com/openai/v1")
-    api_key = os.environ.get("REDTEAM_API_KEY", "")
+    api_key = os.environ.get("REDTEAM_API_KEY") or os.environ.get("GROQ_API_KEY", "")
     if not api_key:
-        raise ChatError("REDTEAM_API_KEY is not set; see README for setup")
+        raise ChatError("REDTEAM_API_KEY (or GROQ_API_KEY) is not set; see README for setup")
     return lambda model, messages: chat(base_url, api_key, model, messages)

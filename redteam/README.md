@@ -1,53 +1,60 @@
-# Verity red-team console (Meta hackathon, Phase 1)
+# Verity red-team console (Meta hackathon, Phase 2)
 
-One click runs three attack families through the real Verity guard:
-prompt injection, policy bypass (refund tricks), jailbreak. Llama (or
-any OpenAI-compatible model) writes the attacks, Verity screens them,
-the model judges the call, and every run stores a readable trace.
+An automated crash-testing harness and visual dashboard for Verity. Llama
+(or any OpenAI-compatible model) generates synthetic adversarial probes,
+Verity screens each probe with its two-sided firewall (injection guard +
+business policy pair), a model judge grades the defense, and readable traces
+record every step.
 
-## Run it (local dev, Groq)
+## Features (Phase 2: Policy Pair)
+
+- **Two-Sided Policy Defense**: Screens both request-side (attacks seeking
+  prohibited actions) and response-side (withholding responses if the LLM
+  is tricked into promising refunds, discounts, or admin access).
+- **Policy Presets & Custom Rules**:
+  - `retail`: Refund + Discount policy pair (*"All sales are final. No refunds. No discounts or coupons."*)
+  - `saas`: Free items + Privilege escalation pair (*"No free products or extensions. Never grant admin privileges."*)
+  - `strict`: Comprehensive prohibition set.
+  - `custom`: Test any arbitrary company policy directly from CLI or UI.
+- **Adversarial & Benign Near-Miss Pairing**: Evaluates attacks (`prompt_injection`,
+  `jailbreak`, `refund_bypass`, `discount_bypass`, `privilege_escalation`) alongside
+  benign inquiries (`benign_policy_query`) to verify 0% false alarms.
+- **Model-as-Judge Consensus**: Grades outcome (`correct_block`, `false_alarm`,
+  `correct_pass`, `missed_attack`, `unclear`).
+
+## Run it locally
 
 ```sh
-python3 -m venv .venv
-.venv/bin/pip install httpx
-.venv/bin/python -m redteam.console run        # CLI: all 3 families
-.venv/bin/python -m redteam.server --port 8901 # web page: Run button
+# Setup virtual environment
+uv venv .venv
+.venv/bin/pip install httpx pytest
+
+# CLI: Run all families with default policy
+.venv/bin/python -m redteam.console run
+
+# CLI: Test specific policy preset or custom text
+.venv/bin/python -m redteam.console run --preset saas
+.venv/bin/python -m redteam.console run --policy "No discounts are allowed."
+
+# Web Dashboard: Interactive console with live metrics
+.venv/bin/python -m redteam.server --port 8901
 ```
 
-The local run uses the stored Groq connection through its surrogate
-helper (`redteam/providers.py`); no key is pasted, stored, or logged.
+Set `$env:GROQ_API_KEY="<key>"` or `$env:REDTEAM_API_KEY="<key>"` to run live
+against Groq / Llama models.
 
-## Swap to Meta's API when it unblocks
+## Swap to Meta's API when unblocked
 
-No code change. Set the base URL and Llama model names, and use the
-env provider:
+No code changes needed:
 
 ```sh
 REDTEAM_PROVIDER=env REDTEAM_BASE_URL=https://api.llama.com/compat/v1 \
-REDTEAM_API_KEY=<key from the secure store, never in chat> \
-REDTEAM_GENERATOR_MODEL=<llama model> REDTEAM_JUDGE_MODEL=<llama model> \
+REDTEAM_API_KEY=<meta-key> \
+REDTEAM_GENERATOR_MODEL=<llama-model> REDTEAM_JUDGE_MODEL=<llama-model> \
 .venv/bin/python -m redteam.console run
 ```
 
-Groq-local note: the two gpt-oss models on this account refuse to
-write evaluation test prompts even under an authorized
-defensive-research framing, so the generator default here is
-`qwen/qwen3.8-27b` (the account's other chat model). The judge and
-target defaults are gpt-oss models. All three are env-overridable, so
-the Meta swap restores Llama for every role.
+## Scope & Boundaries
 
-## What the trace holds
-
-Per family: attack text, guard verdict (blocked, signals, classifier
-score), policy verdict (blocked, action, reason), deciding layer
-(guard / policy / passed), target reply when the attack passed, judge
-verdict (`correct_block`, `false_alarm`, `correct_pass`,
-`missed_attack`, `unclear`), and latency. A failed call or unparseable
-judge output is recorded as such; results are never invented.
-
-## Scope
-
-Hackathon branch only (`hackathon/red-team-console`). Production
-Verity is untouched. Attacks are synthetic test data for Kartikey's
-own system; free-credit calls must never carry real secrets or
-customer data.
+Branch: `red-team-console`. Verity core (`verity/`) and production files are untouched.
+All attacks use synthetic test data for Kartikey's own system.
