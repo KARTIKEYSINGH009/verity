@@ -974,7 +974,7 @@ a:focus-visible, button:focus-visible, select:focus-visible, textarea:focus-visi
 }
 button:disabled { opacity: 0.55; cursor: not-allowed; }
 .code-box, pre { background: var(--bg-surface) !important; border: 1px solid var(--border) !important; color: var(--text-main) !important; border-radius: 6px; }
-.badge-pill, .badge-env, .rate-pill { border-radius: 999px; font-weight: 600; }
+.badge-pill, .badge-env, .rate-pill { border-radius: 6px; font-weight: 600; }
 .dot-live { background: var(--green); }
 @media (max-width: 900px) {
   aside.sidebar { width: 100% !important; height: auto !important; border-right: none !important; border-bottom: 1px solid var(--border); position: static !important; }
@@ -983,6 +983,66 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   .top-header { padding: 14px 16px; flex-wrap: wrap; gap: 12px; }
   table { display: block; overflow-x: auto; }
 }
+
+
+/* ---- Redesign shell port, premium palette only ---- */
+body.sidebar-collapsed { --sidebar-w: 62px; }
+body.sidebar-collapsed .nav-label, body.sidebar-collapsed .brand-text { display: none; }
+body.sidebar-collapsed .nav-item, body.sidebar-collapsed .brand-block { justify-content: center; }
+body.sidebar-collapsed .side-meta { justify-content: center; }
+.sidebar-toggle { margin-left: auto; background: transparent; border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px; cursor: pointer; color: var(--text-muted); line-height: 0; }
+.sidebar-toggle:hover { background: var(--bg-surface); color: var(--text-main); }
+/* 12-column grid for cards: scorecard 4 x span 3, policy 2 x span 6, equal heights via grid stretch */
+.scorecard-grid { grid-template-columns: repeat(12, 1fr); align-items: stretch; }
+.score-card { grid-column: span 3; }
+.policy-cards-grid { grid-template-columns: repeat(12, 1fr); align-items: stretch; }
+.policy-card { grid-column: span 6; }
+/* Coverage detection-rate bars, computed from real atlas data */
+.atlas-bar-row { display: grid; grid-template-columns: 180px 1fr 90px; gap: 12px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
+.atlas-bar-track { height: 8px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.atlas-bar-fill { height: 100%; background: var(--gold); }
+/* Live trace list in Live Console */
+.live-trace-item { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+.live-trace-item { animation: rise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both; }
+/* Scenario preset cards in Configure, rendered from real fixtures.scenarios */
+.scenario-preset-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
+.scenario-preset-card { grid-column: span 4; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+/* ---- Animations, gold/ink/ivory/status only, no gradient, no blur, no glow ---- */
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slide-left { from { opacity: 0; transform: translateX(26px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes flow-dash { to { stroke-dashoffset: -28; } }
+@keyframes pulse-ring { 0% { transform: scale(0.85); opacity: 0.75; } 70% { transform: scale(1.7); opacity: 0; } 100% { opacity: 0; } }
+@keyframes sweep { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+/* Rise on view change: panels only, never the canonical scorecard grid or its numbers */
+.view-container.active .panel-box, .view-container.active .pipeline-card, .view-container.active .atlas-matrix-box, .view-container.active .chart-box, .view-container.active .replay-col { animation: rise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.view-container.active .scorecard-grid, .view-container.active .score-card { animation: none; }
+/* Drawer slide-in from the right (existing right transition kept, slide-left keyframe added) */
+.trace-drawer.active { animation: slide-left 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }
+/* Pipeline flow dashes: gold dashed stroke, paused until a run is in progress */
+.flow-track { display: none; margin-top: 12px; height: 6px; }
+body.is-running .flow-track { display: block; }
+.flow-svg { width: 100%; height: 6px; display: block; }
+.flow-line { stroke: #8A6D1F; stroke-width: 2; stroke-dasharray: 8 6; animation: flow-dash 0.9s linear infinite; animation-play-state: paused; }
+body.is-running .flow-line { animation-play-state: running; }
+/* Pulse ring on the running stage dot: gold ring, opacity/scale only, no shadow */
+.run-dot { display: none; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); position: relative; flex-shrink: 0; }
+body.is-running .run-dot { display: inline-block; }
+body.is-running .run-dot::after { content: ''; position: absolute; inset: -4px; border: 1px solid var(--gold); border-radius: 50%; animation: pulse-ring 1.8s cubic-bezier(0.2, 0.6, 0.3, 1) infinite; }
+/* Run progress bar with sweep shimmer: solid light-gold tint, not a gradient */
+.run-progress { position: relative; height: 8px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin-bottom: 12px; }
+.run-progress-fill { display: block; height: 100%; width: 0%; background: var(--gold); transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1); }
+.run-progress-sweep { display: none; position: absolute; top: 0; bottom: 0; width: 30%; background: #F3EAD3; }
+body.is-running .run-progress-sweep { display: block; animation: sweep 2.4s ease-in-out infinite; }
+/* Blink only for the live running indicator, only while a run is in progress */
+body.is-running .dot-live { animation: blink 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+@media (max-width: 900px) {
+  .score-card { grid-column: span 6; }
+  .policy-card, .scenario-preset-card { grid-column: span 12; }
+  .atlas-bar-row { grid-template-columns: 1fr; gap: 4px; }
+}
+@media (max-width: 600px) { .score-card { grid-column: span 12; } }
 
 </style>
 </head>
@@ -999,46 +1059,47 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
         <h1>VERITY</h1>
         <span>AI SECURITY</span>
       </div>
+      <button class="sidebar-toggle" id="sidebarToggle" aria-label="Collapse sidebar" title="Collapse sidebar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
     </div>
     <nav class="side-nav">
       <div class="nav-item active" data-view="overview">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-        Home
+        <span class="nav-label">Overview</span>
       </div>
-      <div class="nav-item" data-view="replay">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-        See an attack
-      </div>
-      <div class="nav-item" data-view="redteam">
+      <div class="nav-item" data-view="live">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-        Run tests
+        <span class="nav-label">Live Console</span>
       </div>
-      <div class="nav-item" data-view="atlas">
+      <div class="nav-item" data-view="findings">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        <span class="nav-label">Findings</span>
+      </div>
+      <div class="nav-item" data-view="coverage">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-        Attack library
+        <span class="nav-label">Coverage</span>
       </div>
-      <div class="nav-item" data-view="evaluations">
+      <div class="nav-item" data-view="history">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-        Past runs
+        <span class="nav-label">History</span>
       </div>
-      <div class="nav-item" data-view="policies">
+      <div class="nav-item" data-view="configure">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        Rules
+        <span class="nav-label">Configure</span>
       </div>
     </nav>
   </div>
   <div class="sidebar-bottom">
     <div class="side-meta">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      Model: <span id="sidebarModel">Demo (simulated)</span>
+      <span class="nav-label">Model: <span id="sidebarModel">Demo (simulated)</span></span>
     </div>
     <div class="side-meta">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-      Workspace: Local
+      <span class="nav-label">Workspace: Local</span>
     </div>
     <div class="status-indicator">
       <span class="dot-live"></span>
-      <span id="sidebarStatus">Demo mode - local simulation</span>
+      <span class="nav-label" id="sidebarStatus">Demo mode - local simulation</span>
     </div>
   </div>
 </aside>
@@ -1088,7 +1149,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
             <div class="stage-icon">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             </div>
-            <h4>1. Attacker writes a trick</h4>
+            <h4>1. Attacker writes a trick</h4><span class="run-dot" id="runDot" aria-hidden="true"></span>
           </div>
           <div class="stage-body">
             <div class="meta-row"><span>Model:</span><span class="meta-val" id="pipeModel">Demo (simulated)</span></div>
@@ -1145,6 +1206,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
           </div>
         </div>
       </div>
+      <div class="flow-track" id="flowTrack" aria-hidden="true"><svg class="flow-svg" viewBox="0 0 600 6" preserveAspectRatio="none"><line class="flow-line" x1="0" y1="3" x2="600" y2="3"/></svg></div>
     </div>
 
     <!-- Executive Scorecard Header -->
@@ -1202,84 +1264,39 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
       </button>
     </div>
 
-    <!-- Bottom Split: Events Table & Failure Summary -->
-    <div class="split-grid">
-      <div class="panel-box">
-        <div class="panel-header">
-          <span class="panel-title">Recent Attack Events</span>
-          <span style="font-size:0.72rem; color:var(--text-muted);">Click any row or press Enter to inspect forensic trace</span>
-        </div>
-        <div class="filter-bar">
-          <input type="text" class="filter-input" id="searchEvents" placeholder="Search test ID, family, language, prompt, judge...">
-          <select class="filter-select" id="filterFamily">
-            <option value="all">All Families</option>
-            <option value="Unauthorized refund">Unauthorized refund</option>
-            <option value="Coupon abuse">Coupon abuse</option>
-            <option value="Jailbreak">Jailbreak</option>
-            <option value="Prompt extraction">Prompt extraction</option>
-            <option value="Benign near-miss">Benign near-miss</option>
-            <option value="Multilingual encoded">Multilingual encoded</option>
-          </select>
-          <select class="filter-select" id="filterOutcome">
-            <option value="all">All Outcomes</option>
-            <option value="blocked">Blocked / Intercepted</option>
-            <option value="allowed">Allowed</option>
-            <option value="error">Execution Error</option>
-          </select>
-        </div>
-        <div class="table-scroll-container">
-          <table class="dense-table" id="tableEvents">
-            <thead>
-              <tr>
-                <th style="width:70px;">Time</th>
-                <th style="width:85px;">Test ID</th>
-                <th style="min-width:140px;">Attack Family</th>
-                <th style="width:70px;">Lang</th>
-                <th style="width:105px; text-align:center;">Request</th>
-                <th style="width:115px; text-align:center;">Response</th>
-                <th style="min-width:125px;">Judge Verdict</th>
-                <th style="width:75px; text-align:right;">Latency</th>
-              </tr>
-            </thead>
-            <tbody id="eventsTbody"></tbody>
-          </table>
-        </div>
+    <div class="panel-box">
+      <div class="panel-header">
+        <span class="panel-title">Failure Summary</span>
+        <span class="badge-pill neutral" style="font-size:0.68rem;" id="failureRunBadge">EVAL-RUN #1023</span>
       </div>
-
-      <div class="panel-box">
-        <div class="panel-header">
-          <span class="panel-title">Failure Summary</span>
-          <span class="badge-pill neutral" style="font-size:0.68rem;" id="failureRunBadge">EVAL-RUN #1023</span>
+      <div class="failure-list">
+        <div class="failure-row red" onclick="switchView('coverage')">
+          <div class="failure-left">
+            <span class="failure-num" id="failMissedNum">12</span>
+            <span class="failure-name">Missed attacks</span>
+          </div>
+          <span class="failure-arrow">&rarr;</span>
         </div>
-        <div class="failure-list">
-          <div class="failure-row red" onclick="switchView('atlas')">
-            <div class="failure-left">
-              <span class="failure-num" id="failMissedNum">12</span>
-              <span class="failure-name">Missed attacks</span>
-            </div>
-            <span class="failure-arrow">&rarr;</span>
+        <div class="failure-row amber" onclick="switchView('coverage')">
+          <div class="failure-left">
+            <span class="failure-num" id="failFprNum">3</span>
+            <span class="failure-name">Benign false positives</span>
           </div>
-          <div class="failure-row amber" onclick="switchView('atlas')">
-            <div class="failure-left">
-              <span class="failure-num" id="failFprNum">3</span>
-              <span class="failure-name">Benign false positives</span>
-            </div>
-            <span class="failure-arrow">&rarr;</span>
+          <span class="failure-arrow">&rarr;</span>
+        </div>
+        <div class="failure-row amber" onclick="switchView('history')">
+          <div class="failure-left">
+            <span class="failure-num" id="failDisagreedNum">4</span>
+            <span class="failure-name">Judge disagreements</span>
           </div>
-          <div class="failure-row amber" onclick="switchView('evaluations')">
-            <div class="failure-left">
-              <span class="failure-num" id="failDisagreedNum">4</span>
-              <span class="failure-name">Judge disagreements</span>
-            </div>
-            <span class="failure-arrow">&rarr;</span>
+          <span class="failure-arrow">&rarr;</span>
+        </div>
+        <div class="failure-row dim" onclick="switchView('coverage')">
+          <div class="failure-left">
+            <span class="failure-num" id="failUnsupportedNum">5</span>
+            <span class="failure-name">Unsupported languages</span>
           </div>
-          <div class="failure-row dim" onclick="switchView('atlas')">
-            <div class="failure-left">
-              <span class="failure-num" id="failUnsupportedNum">5</span>
-              <span class="failure-name">Unsupported languages</span>
-            </div>
-            <span class="failure-arrow">&rarr;</span>
-          </div>
+          <span class="failure-arrow">&rarr;</span>
         </div>
       </div>
     </div>
@@ -1413,8 +1430,13 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   </div>
 
   <!-- 3. VIEW: RED TEAM RUN TESTS -->
-  <div class="view-container" id="view-redteam">
+  <div class="view-container" id="view-live">
     <div style="max-width: 820px; margin: 0 auto;">
+      <div class="panel-box" style="margin-bottom:1.5rem;">
+        <div class="panel-title" style="margin-bottom:0.6rem;">Live trace</div>
+        <div class="run-progress" id="runProgress"><span class="run-progress-fill" id="runProgressFill"></span><span class="run-progress-sweep"></span></div>
+        <div id="liveTraces"><p style="font-size:0.8rem; color:var(--text-muted);">No live run yet in this session. Press Run Evaluation Suite below, or Run security evaluation in the top bar.</p></div>
+      </div>
       <div class="panel-box" style="margin-bottom:1.5rem;">
         <div class="panel-title" style="margin-bottom:0.4rem;">Evaluation Presets</div>
         <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
@@ -1459,8 +1481,57 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
     </div>
   </div>
 
+  <!-- 3b. VIEW: FINDINGS (recent events moved here from Overview) -->
+  <div class="view-container" id="view-findings">
+    <div class="panel-box">
+      <div class="panel-header">
+        <span class="panel-title">Recent Attack Events</span>
+        <span style="font-size:0.72rem; color:var(--text-muted);">Click any row or press Enter to inspect forensic trace</span>
+      </div>
+      <div class="filter-bar">
+        <input type="text" class="filter-input" id="searchEvents" placeholder="Search test ID, family, language, prompt, judge...">
+        <select class="filter-select" id="filterFamily">
+          <option value="all">All Families</option>
+          <option value="Unauthorized refund">Unauthorized refund</option>
+          <option value="Coupon abuse">Coupon abuse</option>
+          <option value="Jailbreak">Jailbreak</option>
+          <option value="Prompt extraction">Prompt extraction</option>
+          <option value="Benign near-miss">Benign near-miss</option>
+          <option value="Multilingual encoded">Multilingual encoded</option>
+        </select>
+        <select class="filter-select" id="filterOutcome">
+          <option value="all">All Outcomes</option>
+          <option value="blocked">Blocked / Intercepted</option>
+          <option value="allowed">Allowed</option>
+          <option value="error">Execution Error</option>
+        </select>
+      </div>
+      <div class="table-scroll-container">
+        <table class="dense-table" id="tableEvents">
+          <thead>
+            <tr>
+              <th style="width:70px;">Time</th>
+              <th style="width:85px;">Test ID</th>
+              <th style="min-width:140px;">Attack Family</th>
+              <th style="width:70px;">Lang</th>
+              <th style="width:105px; text-align:center;">Request</th>
+              <th style="width:115px; text-align:center;">Response</th>
+              <th style="min-width:125px;">Judge Verdict</th>
+              <th style="width:75px; text-align:right;">Latency</th>
+            </tr>
+          </thead>
+          <tbody id="eventsTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- 4. VIEW: ATTACK LIBRARY / FAILURE ATLAS -->
-  <div class="view-container" id="view-atlas">
+  <div class="view-container" id="view-coverage">
+    <div class="panel-box" style="margin-bottom:0.85rem;">
+      <div class="panel-header"><span class="panel-title">Detection rate by family</span><span style="font-size:0.72rem; color:var(--text-muted);">From the real failure atlas, RUN-1023</span></div>
+      <div id="atlasBars"></div>
+    </div>
     <div class="atlas-matrix-box">
       <div class="panel-header">
         <div>
@@ -1490,7 +1561,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   </div>
 
   <!-- 5. VIEW: EVALUATION HISTORY -->
-  <div class="view-container" id="view-evaluations">
+  <div class="view-container" id="view-history">
     <div class="chart-box">
       <div class="panel-header">
         <span class="panel-title">Detection Rate Trend (Last 5 Runs)</span>
@@ -1534,13 +1605,17 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   </div>
 
   <!-- 6. VIEW: POLICIES -->
-  <div class="view-container" id="view-policies">
+  <div class="view-container" id="view-configure">
     <div class="panel-header" style="margin-bottom:1.2rem;">
       <div>
         <span class="panel-title" style="font-size:1.05rem;">Policies &amp; Business Rules</span>
         <p style="font-size:0.78rem; color:var(--text-muted); margin-top:2px;">Two-sided constraints evaluated at Request Shield and Response Shield.</p>
       </div>
       <span class="badge-pill allowed">4 POLICIES ACTIVE</span>
+    </div>
+    <div class="panel-box" style="margin-bottom:1.2rem;">
+      <div class="panel-header"><span class="panel-title">Scenario presets</span><span style="font-size:0.72rem; color:var(--text-muted);">Real scenarios from /api/fixtures</span></div>
+      <div class="scenario-preset-grid" id="scenarioPresets"></div>
     </div>
     <div class="policy-cards-grid" id="policiesGrid"></div>
   </div>
@@ -1575,6 +1650,7 @@ let APP_STATE = {
   activeTrace: null,
   selectedTestId: 'TST-1042',
   activeScenario: 'support_refund',
+  liveTraces: [],
   replayTestId: 'TST-1041',
   filterFamily: 'all',
   filterOutcome: 'all',
@@ -1607,12 +1683,13 @@ function switchView(viewName) {
 
   // Title mappings
   const titles = {
-    overview: ['Home', 'We try to trick your AI, then show whether Verity stopped it.'],
-    replay: ['See an attack', 'The same trick, with and without Verity, side by side.'],
-    redteam: ['Run tests', 'Pick a scenario and run the security checks.'],
-    atlas: ['Attack library', 'How Verity did on each kind of trick.'],
-    evaluations: ['Past runs', 'How results changed over time.'],
-    policies: ['Rules', 'The rules Verity checks, before and after the model replies.']
+    overview: ['Overview', 'We try to trick your AI, then show whether Verity stopped it.'],
+    live: ['Live Console', 'Pick a scenario and run the security checks, then inspect the live trace.'],
+    findings: ['Findings', 'Every recent event, with search and filters. Click a row for its trace.'],
+    coverage: ['Coverage', 'How Verity did on each kind of trick.'],
+    history: ['History', 'How results changed over time.'],
+    configure: ['Configure', 'The rules Verity checks, before and after the model replies, plus scenario presets.'],
+    replay: ['See an attack', 'The same trick, with and without Verity, side by side.']
   };
   if (titles[viewName]) {
     $('#viewHeading').textContent = titles[viewName][0];
@@ -1807,6 +1884,8 @@ async function init() {
     renderAtlas();
     renderRuns();
     renderPolicies();
+    renderScenarioPresets();
+    renderLiveTraces();
     setupReplay('TST-1041');
   } catch (err) {
     console.error('Failed to load fixtures:', err);
@@ -1933,6 +2012,17 @@ function renderAtlas() {
     `;
     tbody.appendChild(tr);
   });
+  const bars = $('#atlasBars');
+  if (bars) {
+    bars.innerHTML = '';
+    f.failure_atlas.forEach(row => {
+      const rateNum = parseFloat(row.detection_rate) || 0;
+      const div = document.createElement('div');
+      div.className = 'atlas-bar-row';
+      div.innerHTML = '<span style="font-weight:600;">' + esc(row.family) + '</span><span class="atlas-bar-track"><span class="atlas-bar-fill" style="width:' + rateNum + '%;"></span></span><span class="mono" style="text-align:right;">' + esc(row.detected) + ' / ' + esc(row.tests) + ' (' + esc(row.detection_rate) + ')</span>';
+      bars.appendChild(div);
+    });
+  }
 }
 
 // 3. Evaluations Runs Renderer
@@ -1994,6 +2084,62 @@ function renderPolicies() {
     grid.appendChild(card);
   });
 }
+
+
+// Scenario presets in Configure, rendered from real fixtures.scenarios only.
+function renderScenarioPresets() {
+  const f = APP_STATE.fixtures;
+  const grid = $('#scenarioPresets');
+  if (!f || !grid || !f.scenarios) return;
+  grid.innerHTML = '';
+  Object.keys(f.scenarios).forEach(key => {
+    const scen = f.scenarios[key];
+    const card = document.createElement('div');
+    card.className = 'scenario-preset-card';
+    card.innerHTML = '<h4 style="font-size:0.9rem; font-weight:700; margin-bottom:4px;">' + esc(scen.name) + '</h4><p style="font-size:0.76rem; color:var(--text-muted); margin-bottom:8px;">' + esc(scen.description || '') + '</p><p class="mono" style="font-size:0.74rem; margin-bottom:10px;">' + esc(scen.policy) + '</p>';
+    const btn = document.createElement('button');
+    btn.className = 'btn-secondary';
+    btn.textContent = 'Use this scenario';
+    btn.onclick = () => {
+      APP_STATE.activeScenario = key;
+      const hd = document.getElementById('activeScenario'); if (hd) hd.value = key;
+      const rt = document.getElementById('rtScenarioSelect'); if (rt) rt.value = key;
+      const pt = document.getElementById('rtPolicyText'); if (pt) pt.value = scen.policy;
+    };
+    card.appendChild(btn);
+    grid.appendChild(card);
+  });
+}
+
+// Live trace list in Live Console, from the latest run only (never fabricated).
+function renderLiveTraces() {
+  const box = $('#liveTraces');
+  if (!box) return;
+  const traces = APP_STATE.liveTraces || [];
+  if (!traces.length) return;
+  box.innerHTML = '';
+  traces.forEach(ev => {
+    const div = document.createElement('div');
+    div.className = 'live-trace-item';
+    const reqCls = escCls(ev.request_decision);
+    const respCls = escCls(ev.response_decision);
+    div.innerHTML = '<div style="display:flex; justify-content:space-between; gap:8px; margin-bottom:4px;"><span style="font-weight:700;">' + esc(ev.family) + '</span><span class="mono" style="color:var(--text-muted);">' + esc(ev.latency_ms) + ' ms</span></div><div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;"><span class="badge-pill ' + reqCls + '">' + esc(ev.request_decision) + '</span><span class="badge-pill ' + respCls + '">' + esc(ev.response_decision) + '</span><span style="font-size:0.76rem; color:var(--text-muted);">' + esc(ev.judge_result) + '</span></div><div class="code-box" style="font-size:0.74rem;">' + esc(ev.prompt || '') + '</div>';
+    box.appendChild(div);
+  });
+}
+
+// Collapsible sidebar + keyboard view switching (1-6, [ toggles sidebar).
+const sidebarToggleBtn = document.getElementById('sidebarToggle');
+if (sidebarToggleBtn) sidebarToggleBtn.onclick = () => document.body.classList.toggle('sidebar-collapsed');
+if (window.innerWidth < 1024) document.body.classList.add('sidebar-collapsed');
+document.addEventListener('keydown', (e) => {
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+  if (e.key === '[') { document.body.classList.toggle('sidebar-collapsed'); return; }
+  const views = ['overview', 'live', 'findings', 'coverage', 'history', 'configure'];
+  const n = Number(e.key);
+  if (n >= 1 && n <= views.length) switchView(views[n - 1]);
+});
 
 // 5. Counterfactual Attack Replay Controller
 function setupReplay(testId) {
@@ -2217,6 +2363,8 @@ $('#btnRunEval').onclick = runEvaluation;
 $('#btnLaunchRun').onclick = runEvaluation;
 
 async function runEvaluation() {
+  document.body.classList.add('is-running');
+  const pf = $('#runProgressFill'); if (pf) pf.style.width = '50%';
   const btn = $('#btnRunEval');
   const launchBtn = $('#btnLaunchRun');
   btn.disabled = true;
@@ -2327,16 +2475,21 @@ async function runEvaluation() {
           };
         });
         APP_STATE.fixtures.recent_events = [...newEvents, ...APP_STATE.fixtures.recent_events];
+        APP_STATE.liveTraces = newEvents;
         renderOverview();
+        renderLiveTraces();
+        if (pf) pf.style.width = '100%';
       }
     }
 
     // Success is visible in the scorecard and event feed. No alert needed.
   } catch (err) {
+    if (pf) pf.style.width = '0%';
     $('#pipeAttackState').textContent = 'ERROR';
     $('#pipeAttackState').className = 'badge-pill error';
     alert('Evaluation error: ' + err.message);
   } finally {
+    document.body.classList.remove('is-running');
     btn.disabled = false;
     if (launchBtn) launchBtn.disabled = false;
     btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run security evaluation';
