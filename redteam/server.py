@@ -2614,6 +2614,13 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+        elif self.path == "/api/replay":
+            body = json.dumps({"replay_scenarios": fixtures.REPLAY_SCENARIOS}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         elif self.path == "/api/fixtures":
             data = {
                 "canonical_evaluation": fixtures.CANONICAL_EVALUATION,

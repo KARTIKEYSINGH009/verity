@@ -5,11 +5,10 @@ console handler (redteam.server.Handler) so the deployed page, fixtures
 and demo run are exactly the local ones, with one path normalisation:
 a request to /api itself is the console home page.
 
-Public deploy runs demo-only by design: no REDTEAM_API_KEY or
-GROQ_API_KEY is set on Vercel, so POST /run falls back to
-engine.run_demo (real local guard/policy, canned probes, no LLM spend).
-Live model runs need a key set in the project env, which is a separate,
-explicit step.
+Live model runs use GROQ_API_KEY (or REDTEAM_API_KEY) from the
+Vercel project environment when it is set; without a key, POST /run
+falls back to engine.run_demo (real local guard/policy, canned probes,
+no LLM spend). The key itself is never returned in any response.
 """
 import os
 import sys
