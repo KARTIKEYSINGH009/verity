@@ -1001,6 +1001,14 @@ body.sidebar-collapsed .side-meta { justify-content: center; }
 .atlas-bar-row { display: grid; grid-template-columns: 180px 1fr 90px; gap: 12px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
 .atlas-bar-track { height: 8px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
 .atlas-bar-fill { height: 100%; background: var(--gold); }
+
+/* Staged live prompt-injection animation in Live Console: gold dots only, no glow */
+.live-stage-track { display: flex; align-items: center; gap: 6px; margin: 6px 0 2px; }
+.live-stage { font-size: 0.68rem; color: var(--text-muted); padding: 2px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-surface); }
+.live-stage.active { color: var(--text-main); border-color: var(--gold-border); background: var(--gold-bg); font-weight: 700; }
+.live-stage.done { color: var(--green); border-color: var(--green-border); background: var(--green-bg); }
+.live-stage-arrow { color: var(--text-dim); font-size: 0.7rem; }
+.live-stage-track .live-stage.active::after { content: ''; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--gold); animation: blink 1.4s ease-in-out infinite; }
 /* Live trace list in Live Console */
 .live-trace-item { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
 .live-trace-item { animation: rise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both; }
@@ -2111,6 +2119,62 @@ function renderScenarioPresets() {
   });
 }
 
+
+// Staged live prompt-injection animation: while the real run is in flight,
+// each probe row walks Generate -> Shield (request) -> Target -> Shield
+// (response) -> Judge. No outcomes are shown until the real response
+// arrives; placeholders carry no verdict, only the stage in progress.
+const LIVE_STAGES = ['Generate', 'Shield: request', 'Target', 'Shield: response', 'Judge'];
+const LIVE_PROBE_FAMILIES = ['prompt_injection', 'jailbreak', 'refund_bypass', 'discount_bypass', 'privilege_escalation', 'benign_policy_query'];
+let liveAnimTimer = null;
+function renderLivePlaceholders() {
+  const box = $('#liveTraces');
+  if (!box) return;
+  if (liveAnimTimer) { clearInterval(liveAnimTimer); liveAnimTimer = null; }
+  box.innerHTML = '';
+  LIVE_PROBE_FAMILIES.forEach((fam, i) => {
+    const div = document.createElement('div');
+    div.className = 'live-trace-item';
+    div.id = 'live-probe-' + i;
+    let stages = LIVE_STAGES.map((st, si) => '<span class="live-stage' + (si === 0 ? ' active' : '') + '" data-stage="' + si + '">' + st + '</span>').join('<span class="live-stage-arrow">\u2192</span>');
+    div.innerHTML = '<div style="display:flex; justify-content:space-between; gap:8px; margin-bottom:4px;"><span style="font-weight:700;">' + esc(fam) + '</span><span class="mono" style="color:var(--text-muted);">running</span></div><div class="live-stage-track">' + stages + '</div><div style="font-size:0.76rem; color:var(--text-muted);">Waiting for the real trace from the backend. No verdict yet.</div>';
+    box.appendChild(div);
+  });
+  let step = 0;
+  liveAnimTimer = setInterval(() => {
+    step++;
+    LIVE_PROBE_FAMILIES.forEach((fam, i) => {
+      const row = document.getElementById('live-probe-' + i);
+      if (!row) return;
+      const probeStep = Math.min(LIVE_STAGES.length - 1, Math.max(0, step - i * 2));
+      row.querySelectorAll('.live-stage').forEach((el, si) => {
+        el.classList.toggle('active', si === probeStep);
+        el.classList.toggle('done', si < probeStep);
+      });
+    });
+    if (step > LIVE_PROBE_FAMILIES.length * 2 + LIVE_STAGES.length) { clearInterval(liveAnimTimer); liveAnimTimer = null; }
+  }, 450);
+}
+function revealLiveTracesStaggered() {
+  if (liveAnimTimer) { clearInterval(liveAnimTimer); liveAnimTimer = null; }
+  const traces = APP_STATE.liveTraces || [];
+  if (!traces.length) { renderLiveTraces(); return; }
+  const box = $('#liveTraces');
+  if (!box) return;
+  box.innerHTML = '';
+  traces.forEach((ev, i) => {
+    setTimeout(() => {
+      const div = document.createElement('div');
+      div.className = 'live-trace-item';
+      div.style.animation = 'rise 0.42s ease both';
+      const reqCls = escCls(ev.request_decision);
+      const respCls = escCls(ev.response_decision);
+      div.innerHTML = '<div style="display:flex; justify-content:space-between; gap:8px; margin-bottom:4px;"><span style="font-weight:700;">' + esc(ev.family) + '</span><span class="mono" style="color:var(--text-muted);">' + esc(ev.latency_ms) + ' ms</span></div><div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;"><span class="badge-pill ' + reqCls + '">' + esc(ev.request_decision) + '</span><span class="badge-pill ' + respCls + '">' + esc(ev.response_decision) + '</span><span style="font-size:0.76rem; color:var(--text-muted);">' + esc(ev.judge_result) + '</span></div><div class="code-box" style="font-size:0.74rem;">' + esc(ev.prompt || '') + '</div>';
+      box.appendChild(div);
+    }, i * 300);
+  });
+}
+
 // Live trace list in Live Console, from the latest run only (never fabricated).
 function renderLiveTraces() {
   const box = $('#liveTraces');
@@ -2364,6 +2428,7 @@ $('#btnLaunchRun').onclick = runEvaluation;
 
 async function runEvaluation() {
   document.body.classList.add('is-running');
+    renderLivePlaceholders();
   const pf = $('#runProgressFill'); if (pf) pf.style.width = '50%';
   const btn = $('#btnRunEval');
   const launchBtn = $('#btnLaunchRun');
@@ -2477,13 +2542,16 @@ async function runEvaluation() {
         APP_STATE.fixtures.recent_events = [...newEvents, ...APP_STATE.fixtures.recent_events];
         APP_STATE.liveTraces = newEvents;
         renderOverview();
-        renderLiveTraces();
+        revealLiveTracesStaggered();
         if (pf) pf.style.width = '100%';
       }
     }
 
     // Success is visible in the scorecard and event feed. No alert needed.
   } catch (err) {
+    if (liveAnimTimer) { clearInterval(liveAnimTimer); liveAnimTimer = null; }
+    const lb = $('#liveTraces');
+    if (lb && !(APP_STATE.liveTraces && APP_STATE.liveTraces.length)) lb.innerHTML = '<p style="font-size:0.8rem; color:var(--text-muted);">Run failed. No verdicts shown, nothing was fabricated.</p>';
     if (pf) pf.style.width = '0%';
     $('#pipeAttackState').textContent = 'ERROR';
     $('#pipeAttackState').className = 'badge-pill error';
