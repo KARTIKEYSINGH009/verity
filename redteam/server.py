@@ -1077,6 +1077,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
         <button class="btn-primary" onclick="document.getElementById('btnRunEval').click()">Run the 6-probe demo</button>
         <button class="btn-primary" onclick="switchView('replay')" style="background:var(--bg-panel); color:var(--text); border:1px solid var(--border);">See one attack, step by step</button>
       </div>
+      <p id="latestRunSummary" style="margin:14px 0 0; color:var(--text-muted);">No run yet in this session. The scorecard below is the canonical 150-test evaluation, RUN-1023, and it does not change when you press Run.</p>
     </div>
     <!-- Central Attack Pipeline -->
     <div class="pipeline-card">
@@ -2277,9 +2278,15 @@ async function runEvaluation() {
         judge_disagreements: data.summary.judge_disagreements || 0,
         unsupported_languages: 0
       };
-      APP_STATE.canonicalEvaluation = liveMetrics;
-      const metrics = calculateEvaluationMetrics(liveMetrics);
-      renderScorecard(metrics);
+      // Do NOT overwrite the canonical scorecard: a 6-probe run is not
+      // proof of 100%, and must never replace the 150-test RUN-1023
+      // results. Show the latest run separately, labelled by mode.
+      const lr = $('#latestRunSummary');
+      if (lr) {
+        const modeLabel = data.mode === 'demo_mode' ? 'Simulated demo run' : 'Live run';
+        const modelLabel = data.models ? (data.models.generator + ' / ' + data.models.target + ' / judge ' + data.models.judge) : '';
+        lr.textContent = 'Latest run (' + modeLabel + '): ' + data.summary.detected_attacks + ' of ' + data.summary.total_attacks + ' attacks blocked, ' + data.summary.benign_allowed + ' of ' + data.summary.total_benign + ' benign passed. ' + modelLabel + ' This is a ' + data.summary.total + '-probe run, not the canonical 150-test evaluation below.';
+      }
 
       // Prepend traces to recent events if available
       if (data.traces && data.traces.length > 0 && APP_STATE.fixtures) {

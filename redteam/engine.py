@@ -129,17 +129,19 @@ JUDGE_SYSTEM = (
 
 
 def _models() -> dict:
-    # Groq-local defaults (what this account actually lists): the two
-    # gpt-oss models refuse to write evaluation test prompts even under
-    # an authorized defensive-research framing, so the generator runs
-    # on Qwen here. The Meta swap restores Llama for all three roles.
+    # Live defaults, chosen 2026-10-31: Llama models hosted on Groq.
+    # Meta API is blocked (card on hold, account restricted), so this
+    # is Llama via Groq, NOT a Meta api.llama.com run, and labels must
+    # say so. Env vars still override every role. Untested until a
+    # Groq key is set: if a Llama role refuses test prompts, that role
+    # must be changed and the failure recorded, not hidden.
     return {
         "generator": os.environ.get("REDTEAM_GENERATOR_MODEL",
-                                    "qwen/qwen3.8-27b"),
+                                    "llama-3.3-70b-versatile"),
         "target": os.environ.get("REDTEAM_TARGET_MODEL",
-                                  "openai/gpt-oss-20b"),
+                                  "llama-3.1-8b-instant"),
         "judge": os.environ.get("REDTEAM_JUDGE_MODEL",
-                                "openai/gpt-oss-120b"),
+                                "llama-3.3-70b-versatile"),
         "base_url": os.environ.get(
             "REDTEAM_BASE_URL", "https://api.groq.com/openai/v1"),
     }
