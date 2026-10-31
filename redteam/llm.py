@@ -18,7 +18,7 @@ class ChatError(RuntimeError):
 
 def chat(base_url: str, api_key: str, model: str,
          messages: list, timeout: int = 120,
-         max_tokens: int = 300) -> str:
+         max_tokens: int = 800) -> str:  # gpt-oss reasoning needs headroom; 300 gave empty replies
     """One chat-completions call; returns the assistant text."""
     payload = json.dumps({"model": model, "messages": messages,
                           "max_tokens": max_tokens}).encode()

@@ -129,19 +129,19 @@ JUDGE_SYSTEM = (
 
 
 def _models() -> dict:
-    # Live defaults, chosen 2026-10-31: Llama models hosted on Groq.
-    # Meta API is blocked (card on hold, account restricted), so this
-    # is Llama via Groq, NOT a Meta api.llama.com run, and labels must
-    # say so. Env vars still override every role. Untested until a
-    # Groq key is set: if a Llama role refuses test prompts, that role
-    # must be changed and the failure recorded, not hidden.
+    # Live defaults, verified 2026-10-31 with a real Groq run:
+    # Qwen generator, gpt-oss target and judge, all hosted on Groq.
+    # Llama chat models are NOT in this Groq account's model list
+    # (llama-3.3-70b-versatile returns model_not_found), so Llama via
+    # Groq is not possible here today. Labels must say Groq-hosted
+    # Qwen/gpt-oss, never Llama and never Meta API. Env vars override.
     return {
         "generator": os.environ.get("REDTEAM_GENERATOR_MODEL",
-                                    "llama-3.3-70b-versatile"),
+                                    "qwen/qwen3.8-27b"),
         "target": os.environ.get("REDTEAM_TARGET_MODEL",
-                                  "llama-3.1-8b-instant"),
+                                  "openai/gpt-oss-20b"),
         "judge": os.environ.get("REDTEAM_JUDGE_MODEL",
-                                "llama-3.3-70b-versatile"),
+                                "openai/gpt-oss-120b"),
         "base_url": os.environ.get(
             "REDTEAM_BASE_URL", "https://api.groq.com/openai/v1"),
     }
