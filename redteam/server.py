@@ -248,9 +248,9 @@ main.main-viewport {
   letter-spacing: 0.05em;
   padding: 0.3rem 0.6rem;
   border-radius: 5px;
-  background: #2A3038;
-  color: var(--text-muted);
-  border: 1px solid var(--border);
+  background: var(--gold-bg);
+  color: var(--gold);
+  border: 1px solid var(--gold-border);
 }
 .badge-env.live {
   background: var(--green-bg);
@@ -276,7 +276,7 @@ main.main-viewport {
 .btn-primary:hover:not(:disabled) { background: #B8965A; }
 .btn-primary:active:not(:disabled) { background: #A6844E; }
 .btn-primary:focus-visible { outline: 1px solid #C9A86A; outline-offset: 2px; box-shadow: none; }
-.btn-primary:disabled { background: #2A3038; color: var(--text-muted); cursor: not-allowed; opacity: 1; }
+.btn-primary:disabled { background: #EFEDE6; color: var(--text-muted); cursor: not-allowed; opacity: 1; }
 
 .btn-secondary {
   background: var(--bg-surface);
@@ -580,7 +580,7 @@ table.dense-table tr.selected td {
 .badge-pill.intercepted { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
 .badge-pill.not-reached { background: #EFEDE6; color: var(--text-muted); border: 1px solid var(--border); }
 .badge-pill.error { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
-.badge-pill.neutral { background: #2A3038; color: var(--text-muted); border: 1px solid #2A3038; }
+.badge-pill.neutral { background: #EFEDE6; color: var(--text-main); border: 1px solid var(--border); }
 
 /* Failure Summary List */
 .failure-list {
