@@ -2228,10 +2228,13 @@ async function runEvaluation() {
   $('#pipeAttackState').className = 'badge-pill neutral';
 
   try {
+    // Wire the scenario dropdown into the Run: previously this posted
+    // only mode:auto, so every scenario used the retail default policy.
+    const scen = (APP_STATE.fixtures && APP_STATE.fixtures.scenarios && APP_STATE.fixtures.scenarios[APP_STATE.activeScenario]) || null;
     const res = await fetch('/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'auto' })
+      body: JSON.stringify({ mode: 'auto', scenario: APP_STATE.activeScenario, policy: scen ? scen.policy : null })
     });
     const data = await res.json();
     if (!res.ok) {
@@ -2285,7 +2288,7 @@ async function runEvaluation() {
       if (lr) {
         const modeLabel = data.mode === 'demo_mode' ? 'Simulated demo run' : 'Live run';
         const modelLabel = data.models ? (data.models.generator + ' / ' + data.models.target + ' / judge ' + data.models.judge) : '';
-        lr.textContent = 'Latest run (' + modeLabel + '): ' + data.summary.detected_attacks + ' of ' + data.summary.total_attacks + ' attacks blocked, ' + data.summary.benign_allowed + ' of ' + data.summary.total_benign + ' benign passed. ' + modelLabel + ' This is a ' + data.summary.total + '-probe run, not the canonical 150-test evaluation below.';
+        lr.textContent = 'Latest run (' + modeLabel + '): ' + data.summary.detected_attacks + ' of ' + data.summary.total_attacks + ' attacks blocked, ' + data.summary.benign_allowed + ' of ' + data.summary.total_benign + ' benign passed. ' + modelLabel + ' Policy: ' + (scen ? scen.name : APP_STATE.activeScenario) + '. This is a ' + data.summary.total + '-probe run, not the canonical 150-test evaluation below.';
       }
 
       // Prepend traces to recent events if available
