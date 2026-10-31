@@ -77,8 +77,8 @@ body {
   background: var(--bg-app);
   color: var(--text-main);
   font-family: var(--font-sans);
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 15px;
+  line-height: 1.6;
   min-height: 100vh;
   display: flex;
   overflow-x: hidden;
@@ -954,7 +954,7 @@ main.main-viewport { background: var(--bg-app); }
 .top-header { background: var(--bg-panel); padding: 18px 28px; }
 .title-group h2 { font-size: 1.35rem; letter-spacing: -0.01em; }
 .title-group p { color: var(--text-muted); font-size: 0.9rem; }
-.nav-item { border-radius: 6px; font-size: 0.88rem; padding: 9px 12px; }
+.nav-item { border-radius: 6px; font-size: 0.98rem; padding: 11px 12px; }
 .nav-item.active { background: var(--gold-bg); color: var(--gold); border: 1px solid var(--gold-border); border-left: 3px solid var(--gold); }
 .panel, .scorecard, .stage-box, .policy-card, .atlas-matrix-box, .replay-col, .drawer, .card {
   background: var(--bg-panel) !important; border: 1px solid var(--border) !important; border-radius: 8px !important;
@@ -1003,27 +1003,27 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
     <nav class="side-nav">
       <div class="nav-item active" data-view="overview">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-        Overview
+        Home
       </div>
       <div class="nav-item" data-view="replay">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-        Attack Replay
+        See an attack
       </div>
       <div class="nav-item" data-view="redteam">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-        Red Team
+        Run tests
       </div>
       <div class="nav-item" data-view="atlas">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-        Attack Library
+        Attack library
       </div>
       <div class="nav-item" data-view="evaluations">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-        Evaluations
+        Past runs
       </div>
       <div class="nav-item" data-view="policies">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        Policies
+        Rules
       </div>
     </nav>
   </div>
@@ -1049,7 +1049,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   <header class="top-header">
     <div class="title-group">
       <h2 id="viewHeading">Red-Team Overview</h2>
-      <p id="viewSubheading">Adversarial testing for customer-facing AI systems.</p>
+      <p id="viewSubheading">We try to trick your AI, then show whether Verity stopped it.</p>
     </div>
     <div class="header-actions">
       <select class="scenario-select" id="activeScenario">
@@ -1067,6 +1067,17 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 
   <!-- 1. VIEW: OVERVIEW -->
   <div class="view-container active" id="view-overview">
+    <!-- Judge walkthrough: plain-language entry point, added 2026-10-31 -->
+    <div class="panel-box" style="margin-bottom:18px; padding:20px 22px;">
+      <div style="font-size:0.72rem; letter-spacing:0.08em; color:var(--gold); font-weight:700;">START HERE, 60 SECONDS</div>
+      <h3 style="margin:6px 0 6px; font-size:1.35rem;">Verity blocks attacks before they reach your AI, then proves it.</h3>
+      <p style="margin:0 0 12px; color:var(--text-muted); max-width:780px;">1. An attacker model writes a trick prompt, for example a fake refund request. 2. Verity screens the prompt, and screens the reply too. 3. A separate judge model checks whether Verity got it right. Blocked means the attack never reached the customer-facing model.</p>
+      <p style="margin:0 0 14px; color:var(--text-muted); max-width:780px;"><strong style="color:var(--text);">Read this page honestly:</strong> The Run button runs 6 probes. Without a live key they are simulated; with a live key they use real models, and the badge at the top shows which mode you are in. The scorecard below is a separate canonical evaluation, RUN-1023, 150 tests, and is not the result of that 6-probe run. In live mode the same Run uses real models and shows their actual names.</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn-primary" onclick="document.getElementById('btnRunEval').click()">Run the 6-probe demo</button>
+        <button class="btn-primary" onclick="switchView('replay')" style="background:var(--bg-panel); color:var(--text); border:1px solid var(--border);">See one attack, step by step</button>
+      </div>
+    </div>
     <!-- Central Attack Pipeline -->
     <div class="pipeline-card">
       <div class="pipeline-stages">
@@ -1076,7 +1087,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
             <div class="stage-icon">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             </div>
-            <h4>Attacker model</h4>
+            <h4>1. Attacker writes a trick</h4>
           </div>
           <div class="stage-body">
             <div class="meta-row"><span>Model:</span><span class="meta-val" id="pipeModel">Demo (simulated)</span></div>
@@ -1094,7 +1105,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
             <div class="stage-icon">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
             </div>
-            <h4>Verity Dual Shield &amp; Perimeter</h4>
+            <h4>2. Verity checks it, twice</h4>
           </div>
           <div class="dual-shield-container">
             <div class="shield-node" id="nodeReqShield">
@@ -1123,7 +1134,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
             <div class="stage-icon">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
             </div>
-            <h4>Judge model</h4>
+            <h4>3. Judge checks Verity</h4>
           </div>
           <div class="stage-body">
             <div class="meta-row"><span>Judge:</span><span class="meta-val" id="pipeJudge">Demo (simulated)</span></div>
@@ -1181,7 +1192,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
     <div class="replay-cta-banner">
       <div class="replay-cta-content">
         <div class="replay-cta-tag">FEATURED DEMO INTERACTION</div>
-        <div class="replay-cta-title">See Counterfactual Attack Replay: Unprotected Baseline vs. Verity Dual Shield</div>
+        <div class="replay-cta-title">See one attack, with and without Verity</div>
         <div class="replay-cta-sub">Examine how the identical adversarial probe succeeds on an unprotected baseline LLM but is blocked by Verity at perimeter or response.</div>
       </div>
       <button class="btn-primary" onclick="switchView('replay')">
@@ -1595,12 +1606,12 @@ function switchView(viewName) {
 
   // Title mappings
   const titles = {
-    overview: ['Red-Team Overview', 'Adversarial testing for customer-facing AI systems.'],
-    replay: ['Counterfactual Attack Replay', 'Same attack probe. Two divergent outcomes side-by-side.'],
-    redteam: ['Red Team', 'Configure and run security evaluations.'],
-    atlas: ['Attack Library', 'Coverage and performance by abuse family.'],
-    evaluations: ['Evaluations', 'Compare performance over time.'],
-    policies: ['Policies', 'Two-sided request and response security rules.']
+    overview: ['Home', 'We try to trick your AI, then show whether Verity stopped it.'],
+    replay: ['See an attack', 'The same trick, with and without Verity, side by side.'],
+    redteam: ['Run tests', 'Pick a scenario and run the security checks.'],
+    atlas: ['Attack library', 'How Verity did on each kind of trick.'],
+    evaluations: ['Past runs', 'How results changed over time.'],
+    policies: ['Rules', 'The rules Verity checks, before and after the model replies.']
   };
   if (titles[viewName]) {
     $('#viewHeading').textContent = titles[viewName][0];
