@@ -18,6 +18,8 @@ dependencies = [
 [tool.setuptools.packages.find]
 include = ["verity*"]
 
-# Vercel: where the FastAPI app lives (fixes FASTAPI_ENTRYPOINT_NOT_FOUND).
-[tool.vercel]
-entrypoint = "verity.gateway:app"
+# Vercel, red-team-console branch only: do NOT set a gateway entrypoint
+# here. This branch deploys the console as a serverless function in
+# api/index.py (see vercel.json). The gateway entrypoint lives on main
+# and serves the separate verity project, so restoring it here makes
+# Vercel serve the gateway instead of the console.
