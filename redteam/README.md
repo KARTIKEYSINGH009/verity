@@ -1,10 +1,12 @@
 # Verity red-team console (Meta hackathon, Phase 2)
 
-An automated crash-testing harness and visual dashboard for Verity. Llama
-(or any OpenAI-compatible model) generates synthetic adversarial probes,
-Verity screens each probe with its two-sided firewall (injection guard +
+An automated crash-testing harness and visual dashboard for Verity. Any
+OpenAI-compatible model generates synthetic adversarial probes, Verity
+screens each probe with its two-sided firewall (injection guard +
 business policy pair), a model judge grades the defense, and readable traces
-record every step.
+record every step. The current live defaults are Groq models (see
+redteam/engine.py). Demo data in the dashboard is labelled DEMO DATA and
+is not a live run.
 
 ## Features (Phase 2: Policy Pair)
 
@@ -18,7 +20,10 @@ record every step.
   - `custom`: Test any arbitrary company policy directly from CLI or UI.
 - **Adversarial & Benign Near-Miss Pairing**: Evaluates attacks (`prompt_injection`,
   `jailbreak`, `refund_bypass`, `discount_bypass`, `privilege_escalation`) alongside
-  benign inquiries (`benign_policy_query`) to verify 0% false alarms.
+  benign inquiries (`benign_policy_query`). The canonical demo dataset in
+  redteam/fixtures.py has 3 benign blocked out of 30, a 10.0% false
+  positive rate. Do not claim 0% false alarms unless a live run with its
+  own counts proves it.
 - **Model-as-Judge Consensus**: Grades outcome (`correct_block`, `false_alarm`,
   `correct_pass`, `missed_attack`, `unclear`).
 
@@ -41,18 +46,27 @@ uv venv .venv
 ```
 
 Set `$env:GROQ_API_KEY="<key>"` or `$env:REDTEAM_API_KEY="<key>"` to run live
-against Groq / Llama models.
+against Groq models. With no key, the CLI and server fall back to demo
+mode, which uses simulated probes and the real local guard and policy
+rules, but not a live model judge.
 
 ## Swap to Meta's API when unblocked
 
-No code changes needed:
+No code changes are needed, but all three model names must be set, and
+the Meta account must actually be unblocked first. See
+redteam/META_SWAP.md for the full checklist. The current Meta path is
+unverified, because the account is restricted at the time of writing.
 
 ```sh
 REDTEAM_PROVIDER=env REDTEAM_BASE_URL=https://api.llama.com/compat/v1 \
 REDTEAM_API_KEY=<meta-key> \
-REDTEAM_GENERATOR_MODEL=<llama-model> REDTEAM_JUDGE_MODEL=<llama-model> \
+REDTEAM_GENERATOR_MODEL=<llama-model> REDTEAM_TARGET_MODEL=<llama-model> \
+REDTEAM_JUDGE_MODEL=<llama-model> \
 .venv/bin/python -m redteam.console run
 ```
+
+After a Meta run, check the run trace for the exact model names used.
+Only then update any UI or submission label to say Llama.
 
 ## Scope & Boundaries
 

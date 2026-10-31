@@ -20,7 +20,19 @@ import argparse
 import json
 import os
 import sys
+import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+# Local console abuse controls. This server binds 127.0.0.1 only.
+# A run lock stops parallel runs doubling LLM cost. A simple per-IP
+# rate limit stops repeated clicks turning into runaway cost. If
+# REDTEAM_CONSOLE_TOKEN is set, POST /run also requires it in the
+# X-Redteam-Token header. Without a token, localhost-only is the control.
+_RUN_LOCK = threading.Lock()
+_RUN_TIMES = []
+_MAX_BODY_BYTES = 65536
+_MAX_RUNS_PER_MINUTE = 5
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))))
@@ -34,34 +46,31 @@ PAGE = r"""<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Verity / Red-Team Console</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg-app: #111418;
-  --bg-panel: #191E24;
-  --bg-card: #15191F;
-  --bg-surface: #1E232B;
-  --border: #2A3038;
-  --text-main: #EDEFF2;
-  --text-muted: #9AA3AD;
-  --text-dim: #9AA3AD;
-  --gold: #C9A86A;
-  --gold-bg: rgba(201, 168, 106, 0.12);
-  --gold-border: rgba(201, 168, 106, 0.30);
-  --green: #22C55E;
-  --green-bg: rgba(34, 197, 94, 0.12);
-  --green-border: rgba(34, 197, 94, 0.28);
-  --red: #EF4444;
-  --red-bg: rgba(239, 68, 68, 0.12);
-  --red-border: rgba(239, 68, 68, 0.28);
-  --amber: #F59E0B;
-  --amber-bg: rgba(245, 158, 11, 0.12);
-  --amber-border: rgba(245, 158, 11, 0.28);
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
-  --sidebar-w: 230px;
+  --bg-app: #F6F4EF;
+  --bg-panel: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-surface: #EFEDE6;
+  --border: #DAD5C9;
+  --text-main: #17191B;
+  --text-muted: #5B6165;
+  --text-dim: #8A9094;
+  --gold: #8A6D1F;
+  --gold-bg: #F3EAD3;
+  --gold-border: #D6C49A;
+  --green: #2F7A52;
+  --green-bg: #E6F1E9;
+  --green-border: #BED8C6;
+  --red: #B03A2E;
+  --red-bg: #FBE9E6;
+  --red-border: #E7BFB8;
+  --amber: #8A5E14;
+  --amber-bg: #FBF0D6;
+  --amber-border: #E3D0A2;
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sidebar-w: 220px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -141,7 +150,7 @@ nav.side-nav {
   border-left: 3px solid transparent;
 }
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: #EFEDE6;
   color: var(--text-main);
 }
 .nav-item.active {
@@ -168,7 +177,7 @@ nav.side-nav {
   border-radius: 5px;
   cursor: pointer;
 }
-.side-meta:hover { background: rgba(255,255,255,0.03); color: var(--text-main); }
+.side-meta:hover { background: #EFEDE6; color: var(--text-main); }
 .status-indicator {
   display: flex;
   align-items: center;
@@ -283,7 +292,7 @@ main.main-viewport {
   align-items: center;
   gap: 0.4rem;
 }
-.btn-secondary:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.18); }
+.btn-secondary:hover { background: #EFEDE6; border-color: #DAD5C9; }
 
 /* View Views */
 .view-container {
@@ -323,7 +332,7 @@ main.main-viewport {
   width: 22px;
   height: 22px;
   border-radius: 5px;
-  background: rgba(255,255,255,0.06);
+  background: #EFEDE6;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -340,7 +349,7 @@ main.main-viewport {
   margin-top: 0.35rem;
 }
 .shield-node {
-  background: rgba(255,255,255,0.02);
+  background: #EFEDE6;
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.5rem 0.65rem;
@@ -526,7 +535,7 @@ table.dense-table th {
 }
 table.dense-table td {
   padding: 0.5rem 0.55rem;
-  border-bottom: 1px solid rgba(255,255,255,0.03);
+  border-bottom: 1px solid #EFEDE6;
   color: var(--text-main);
   white-space: nowrap;
 }
@@ -535,7 +544,7 @@ table.dense-table tr {
   transition: background 0.12s ease;
 }
 table.dense-table tr:hover td {
-  background: rgba(255,255,255,0.035);
+  background: #EFEDE6;
 }
 table.dense-table tr:focus {
   outline: 1px solid var(--gold);
@@ -569,7 +578,7 @@ table.dense-table tr.selected td {
 .badge-pill.allowed { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
 .badge-pill.delivered { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
 .badge-pill.intercepted { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
-.badge-pill.not-reached { background: rgba(255,255,255,0.04); color: var(--text-muted); border: 1px solid var(--border); }
+.badge-pill.not-reached { background: #EFEDE6; color: var(--text-muted); border: 1px solid var(--border); }
 .badge-pill.error { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
 .badge-pill.neutral { background: #2A3038; color: var(--text-muted); border: 1px solid #2A3038; }
 
@@ -590,7 +599,7 @@ table.dense-table tr.selected td {
   cursor: pointer;
   transition: all 0.15s ease;
 }
-.failure-row:hover { border-color: rgba(255,255,255,0.18); background: rgba(255,255,255,0.03); }
+.failure-row:hover { border-color: #DAD5C9; background: #EFEDE6; }
 .failure-left { display: flex; align-items: center; gap: 0.6rem; }
 .failure-num {
   font-size: 0.95rem;
@@ -692,7 +701,7 @@ table.dense-table tr.selected td {
   font-weight: 600;
   color: var(--text-muted);
   cursor: pointer;
-  background: rgba(255,255,255,0.02);
+  background: #EFEDE6;
   user-select: none;
 }
 .tech-explanation summary:hover {
@@ -721,11 +730,11 @@ table.dense-table tr.selected td {
 }
 .replay-bubble.unprotected-ans {
   border-color: var(--red-border);
-  background: rgba(239, 68, 68, 0.05);
+  background: #FBE9E6;
 }
 .replay-bubble.safe-ans {
   border-color: var(--green-border);
-  background: rgba(34, 197, 94, 0.05);
+  background: #E6F1E9;
 }
 .violation-box {
   background: var(--red-bg);
@@ -784,7 +793,7 @@ table.dense-table tr.selected td {
 .drawer-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(23, 25, 27, 0.45);
   z-index: 90;
   display: none;
 }
@@ -936,6 +945,45 @@ svg.sparkline {
   width: 100%;
   height: 140px;
 }
+
+/* ---- Premium flat override: ivory, ink, gold, hairlines only ---- */
+* { box-shadow: none !important; }
+body { background: var(--bg-app); color: var(--text-main); font-size: 15px; line-height: 1.55; }
+aside.sidebar { background: var(--bg-panel); border-right: 1px solid var(--border); }
+main.main-viewport { background: var(--bg-app); }
+.top-header { background: var(--bg-panel); padding: 18px 28px; }
+.title-group h2 { font-size: 1.35rem; letter-spacing: -0.01em; }
+.title-group p { color: var(--text-muted); font-size: 0.9rem; }
+.nav-item { border-radius: 6px; font-size: 0.88rem; padding: 9px 12px; }
+.nav-item.active { background: var(--gold-bg); color: var(--gold); border: 1px solid var(--gold-border); border-left: 3px solid var(--gold); }
+.panel, .scorecard, .stage-box, .policy-card, .atlas-matrix-box, .replay-col, .drawer, .card {
+  background: var(--bg-panel) !important; border: 1px solid var(--border) !important; border-radius: 8px !important;
+}
+.view-container { padding: 24px 28px; max-width: 1180px; margin: 0 auto; width: 100%; }
+.scorecard-header-bar { border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 16px; }
+.score-val, .stat-num { font-size: 1.9rem; letter-spacing: -0.02em; }
+table { font-size: 0.88rem; }
+table th { color: var(--text-muted); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; }
+table td, table th { padding: 11px 12px; border-bottom: 1px solid var(--border); }
+.btn-primary { background: var(--gold) !important; color: #FFFFFF !important; border: 1px solid var(--gold) !important; border-radius: 6px !important; font-weight: 600; }
+.btn-primary:hover { background: #775E1A !important; }
+.btn-secondary, .button.secondary { background: transparent !important; color: var(--text-main) !important; border: 1px solid var(--border) !important; border-radius: 6px !important; }
+a, button, select, textarea, input, [tabindex] { outline: none; }
+a:focus-visible, button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible, [tabindex]:focus-visible, .nav-item:focus-visible, tr:focus-visible {
+  outline: 2px solid var(--gold) !important; outline-offset: 2px;
+}
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+.code-box, pre { background: var(--bg-surface) !important; border: 1px solid var(--border) !important; color: var(--text-main) !important; border-radius: 6px; }
+.badge-pill, .badge-env, .rate-pill { border-radius: 999px; font-weight: 600; }
+.dot-live { background: var(--green); }
+@media (max-width: 900px) {
+  aside.sidebar { width: 100% !important; height: auto !important; border-right: none !important; border-bottom: 1px solid var(--border); position: static !important; }
+  nav.side-nav { flex-direction: row !important; flex-wrap: wrap !important; }
+  .view-container { padding: 16px; }
+  .top-header { padding: 14px 16px; flex-wrap: wrap; gap: 12px; }
+  table { display: block; overflow-x: auto; }
+}
+
 </style>
 </head>
 <body>
@@ -982,7 +1030,7 @@ svg.sparkline {
   <div class="sidebar-bottom">
     <div class="side-meta">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      Model: Llama 3.3
+      Model: <span id="sidebarModel">Demo (simulated)</span>
     </div>
     <div class="side-meta">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
@@ -990,7 +1038,7 @@ svg.sparkline {
     </div>
     <div class="status-indicator">
       <span class="dot-live"></span>
-      <span>Connected (Verity Gateway)</span>
+      <span id="sidebarStatus">Demo mode - local simulation</span>
     </div>
   </div>
 </aside>
@@ -1028,10 +1076,10 @@ svg.sparkline {
             <div class="stage-icon">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             </div>
-            <h4>Llama Attacker</h4>
+            <h4>Attacker model</h4>
           </div>
           <div class="stage-body">
-            <div class="meta-row"><span>Model:</span><span class="meta-val">Llama 3.3 70B</span></div>
+            <div class="meta-row"><span>Model:</span><span class="meta-val" id="pipeModel">Demo (simulated)</span></div>
             <div class="meta-row"><span>Test ID:</span><span class="meta-val" id="pipeTestId">TST-1042</span></div>
             <div class="meta-row"><span>Attack:</span><span class="meta-val" id="pipeAttackName">Unauthorized refund</span></div>
             <div class="meta-row"><span>State:</span><span class="badge-pill neutral" id="pipeAttackState">READY</span></div>
@@ -1075,10 +1123,10 @@ svg.sparkline {
             <div class="stage-icon">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
             </div>
-            <h4>Llama Judge</h4>
+            <h4>Judge model</h4>
           </div>
           <div class="stage-body">
-            <div class="meta-row"><span>Judge:</span><span class="meta-val">Llama 3.1 70B</span></div>
+            <div class="meta-row"><span>Judge:</span><span class="meta-val" id="pipeJudge">Demo (simulated)</span></div>
             <div class="meta-row"><span>Verdict:</span><span class="meta-val" style="color:var(--green);" id="pipeJudgeVerdict">Correct block</span></div>
             <div class="meta-row"><span>Confidence:</span><span class="meta-val" id="pipeJudgeConf">0.96</span></div>
             <div class="meta-row"><span>Status:</span><span class="badge-pill allowed" id="pipeJudgeMatch">MATCH</span></div>
@@ -1384,27 +1432,8 @@ svg.sparkline {
         </div>
 
         <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:1rem; margin-bottom:1.2rem;">
-          <div>
-            <label style="display:block; font-size:0.76rem; font-weight:600; margin-bottom:0.35rem; color:var(--text-muted);">Attacker Model</label>
-            <select class="scenario-select" style="width:100%;">
-              <option>Llama 3.3 70B</option>
-              <option>Llama 3.1 8B</option>
-              <option>Qwen 2.5 72B</option>
-            </select>
-          </div>
-          <div>
-            <label style="display:block; font-size:0.76rem; font-weight:600; margin-bottom:0.35rem; color:var(--text-muted);">Target Application</label>
-            <select class="scenario-select" style="width:100%;">
-              <option>Llama 3.1 8B (Your Bot)</option>
-              <option>GPT-4o mini (Upstream)</option>
-            </select>
-          </div>
-          <div>
-            <label style="display:block; font-size:0.76rem; font-weight:600; margin-bottom:0.35rem; color:var(--text-muted);">Judge Model</label>
-            <select class="scenario-select" style="width:100%;">
-              <option>Llama 3.1 70B</option>
-              <option>Llama 3.1 8B</option>
-            </select>
+          <div style="grid-column:1 / -1;">
+            <p style="font-size:0.76rem; color:var(--text-muted);">Models are not chosen here. A live run uses REDTEAM_GENERATOR_MODEL, REDTEAM_TARGET_MODEL and REDTEAM_JUDGE_MODEL from the server environment, and the run header shows the actual models used. A demo run uses simulated probes, not a live model.</p>
           </div>
         </div>
 
@@ -1466,7 +1495,7 @@ svg.sparkline {
         <text x="175" y="105" fill="var(--text-muted)" font-size="11" text-anchor="middle">85%</text>
         <text x="300" y="40" fill="var(--text-muted)" font-size="11" text-anchor="middle">90%</text>
         <text x="425" y="50" fill="var(--text-muted)" font-size="11" text-anchor="middle">88%</text>
-        <text x="550" y="15" fill="var(--green)" font-weight="bold" font-size="11" text-anchor="middle">92%</text>
+        <text x="550" y="15" fill="var(--gold)" font-weight="bold" font-size="11" text-anchor="middle">92%</text>
       </svg>
     </div>
 
@@ -1542,6 +1571,16 @@ let APP_STATE = {
 
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
+// Escape untrusted text before it is inserted with innerHTML.
+// Model prompts, replies, judge text and fixture strings are data, never markup.
+function esc(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function escCls(v) {
+  return String(v == null ? '' : v).toLowerCase().replace(/[^a-z0-9-]/g, '-');
+}
 
 // Navigation routing
 function switchView(viewName) {
@@ -1713,7 +1752,7 @@ function renderPipeline(ev) {
     respDetail.textContent = 'Response filter error';
   }
 
-  // Llama Judge
+  // Judge verdict
   const judgeVerdict = $('#pipeJudgeVerdict');
   const judgeConf = $('#pipeJudgeConf');
   const judgeMatch = $('#pipeJudgeMatch');
@@ -1806,25 +1845,25 @@ function renderOverview() {
     const tr = document.createElement('tr');
     tr.tabIndex = 0;
     tr.setAttribute('role', 'button');
-    tr.setAttribute('aria-label', `Inspect trace for ${ev.test_id} ${ev.family}`);
+    tr.setAttribute('aria-label', `Inspect trace for ${esc(ev.test_id)} ${esc(ev.family)}`);
     if (ev.test_id === APP_STATE.selectedTestId) {
       tr.classList.add('selected');
     }
 
-    const reqCls = ev.request_decision.toLowerCase();
-    const respCls = ev.response_decision.toLowerCase().replace(' ', '-');
+    const reqCls = escCls(ev.request_decision);
+    const respCls = escCls(ev.response_decision);
     const isSuccess = ev.judge_result.includes('Correct');
     const isErr = ev.judge_result.toLowerCase().includes('error');
 
     tr.innerHTML = `
-      <td class="mono" style="color:var(--text-muted);">${ev.time}</td>
-      <td class="mono" style="color:var(--text-main); font-weight:600;">${ev.test_id}</td>
-      <td style="font-weight:600;">${ev.family}</td>
-      <td>${ev.language}</td>
-      <td style="text-align:center;"><span class="badge-pill ${reqCls}">${ev.request_decision}</span></td>
-      <td style="text-align:center;"><span class="badge-pill ${respCls}">${ev.response_decision}</span></td>
-      <td style="color:${isErr ? 'var(--red)' : (isSuccess ? 'var(--green)' : 'var(--red)')}; font-weight:600;">${ev.judge_result}</td>
-      <td class="mono" style="color:var(--text-muted); text-align:right;">${ev.latency_ms} ms</td>
+      <td class="mono" style="color:var(--text-muted);">${esc(ev.time)}</td>
+      <td class="mono" style="color:var(--text-main); font-weight:600;">${esc(ev.test_id)}</td>
+      <td style="font-weight:600;">${esc(ev.family)}</td>
+      <td>${esc(ev.language)}</td>
+      <td style="text-align:center;"><span class="badge-pill ${reqCls}">${esc(ev.request_decision)}</span></td>
+      <td style="text-align:center;"><span class="badge-pill ${respCls}">${esc(ev.response_decision)}</span></td>
+      <td style="color:${isErr ? 'var(--red)' : (isSuccess ? 'var(--green)' : 'var(--red)')}; font-weight:600;">${esc(ev.judge_result)}</td>
+      <td class="mono" style="color:var(--text-muted); text-align:right;">${esc(ev.latency_ms)} ms</td>
     `;
 
     const selectRow = () => {
@@ -1872,13 +1911,13 @@ function renderAtlas() {
     const pillCls = rateNum >= 90 ? 'high' : (rateNum >= 80 ? 'med' : 'low');
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td style="font-weight:600;">${row.family}</td>
-      <td class="mono">${row.tests}</td>
-      <td><span class="rate-pill ${pillCls}">${row.detected} (${row.detection_rate})</span></td>
-      <td class="mono" style="color:${row.missed > 0 ? 'var(--red)' : 'var(--text-muted)'};">${row.missed}</td>
-      <td class="mono" style="color:${row.false_pos > 0 ? 'var(--amber)' : 'var(--text-muted)'};">${row.false_pos}</td>
-      <td class="mono">${row.coverage}</td>
-      <td><span class="badge-pill ${row.severity === 'CRITICAL' ? 'blocked' : (row.severity === 'HIGH' ? 'intercepted' : 'neutral')}">${row.severity}</span></td>
+      <td style="font-weight:600;">${esc(row.family)}</td>
+      <td class="mono">${esc(row.tests)}</td>
+      <td><span class="rate-pill ${pillCls}">${esc(row.detected)} (${esc(row.detection_rate)})</span></td>
+      <td class="mono" style="color:${row.missed > 0 ? 'var(--red)' : 'var(--text-muted)'};">${esc(row.missed)}</td>
+      <td class="mono" style="color:${row.false_pos > 0 ? 'var(--amber)' : 'var(--text-muted)'};">${esc(row.false_pos)}</td>
+      <td class="mono">${esc(row.coverage)}</td>
+      <td><span class="badge-pill ${row.severity === 'CRITICAL' ? 'blocked' : (row.severity === 'HIGH' ? 'intercepted' : 'neutral')}">${esc(row.severity)}</span></td>
     `;
     tbody.appendChild(tr);
   });
@@ -1893,14 +1932,14 @@ function renderRuns() {
   f.evaluation_runs.forEach(r => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="mono" style="color:var(--text-main); font-weight:600;">${r.run_id}</td>
-      <td class="mono" style="color:var(--text-muted);">${r.date}</td>
-      <td>${r.dataset_version}</td>
-      <td style="color:var(--text-muted); font-size:0.74rem;">${r.models}</td>
-      <td class="mono">${r.tests}</td>
-      <td class="mono" style="color:var(--green); font-weight:600;">${r.detection_rate}</td>
-      <td class="mono" style="color:var(--amber);">${r.false_pos_rate}</td>
-      <td><span class="badge-pill allowed">${r.status}</span></td>
+      <td class="mono" style="color:var(--text-main); font-weight:600;">${esc(r.run_id)}</td>
+      <td class="mono" style="color:var(--text-muted);">${esc(r.date)}</td>
+      <td>${esc(r.dataset_version)}</td>
+      <td style="color:var(--text-muted); font-size:0.74rem;">${esc(r.models)}</td>
+      <td class="mono">${esc(r.tests)}</td>
+      <td class="mono" style="color:var(--green); font-weight:600;">${esc(r.detection_rate)}</td>
+      <td class="mono" style="color:var(--amber);">${esc(r.false_pos_rate)}</td>
+      <td><span class="badge-pill allowed">${esc(r.status)}</span></td>
     `;
     tbody.appendChild(tr);
   });
@@ -1917,27 +1956,27 @@ function renderPolicies() {
     card.className = 'policy-card';
     card.innerHTML = `
       <div class="policy-card-top">
-        <h4>${p.name}</h4>
-        <span class="badge-pill allowed">${p.version} &bull; ACTIVE</span>
+        <h4>${esc(p.name)}</h4>
+        <span class="badge-pill allowed">${esc(p.version)} &bull; ACTIVE</span>
       </div>
-      <p style="font-size:0.77rem; color:var(--text-muted);">${p.scope}</p>
+      <p style="font-size:0.77rem; color:var(--text-muted);">${esc(p.scope)}</p>
       
       <div style="margin-top:0.8rem;">
         <span class="badge-pill neutral" style="font-size:0.65rem;">REQUEST RULES</span>
         <ul class="policy-rule-list">
-          ${p.request_rules.map(r => `<li>${r}</li>`).join('')}
+          ${p.request_rules.map(r => `<li>${esc(r)}</li>`).join('')}
         </ul>
       </div>
 
       <div>
         <span class="badge-pill neutral" style="font-size:0.65rem;">RESPONSE RULES</span>
         <ul class="policy-rule-list">
-          ${p.response_rules.map(r => `<li>${r}</li>`).join('')}
+          ${p.response_rules.map(r => `<li>${esc(r)}</li>`).join('')}
         </ul>
       </div>
 
       <div style="margin-top:0.6rem; padding-top:0.5rem; border-top:1px solid var(--border); font-size:0.72rem; color:var(--text-muted);">
-        Coverage: <b style="color:var(--green);">${p.test_coverage}</b>
+        Coverage: <b style="color:var(--green);">${esc(p.test_coverage)}</b>
       </div>
     `;
     grid.appendChild(card);
@@ -1964,7 +2003,7 @@ function setupReplay(testId) {
   $('#replayUnprotectedAns').textContent = `"${s.unprotected.response}"`;
   const violList = $('#replayViolationsList');
   if (violList && s.unprotected.violations) {
-    violList.innerHTML = s.unprotected.violations.map(v => `<li class="violation-item">${v}</li>`).join('');
+    violList.innerHTML = s.unprotected.violations.map(v => `<li class="violation-item">${esc(v)}</li>`).join('');
   }
 
   // Right: Protected Path
@@ -1992,18 +2031,18 @@ function setupReplay(testId) {
   $('#replaySafeOutput').textContent = `"${s.protected.final_output}"`;
   $('#replayProtectedOutcome').innerHTML = `
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="20 6 9 17 4 12"/></svg>
-    Outcome: ${s.protected.outcome}
+    Outcome: ${esc(s.protected.outcome)}
   `;
 
   // Technical Forensic Explanation
   const techBody = $('#replayTechDetail');
   if (techBody) {
     techBody.innerHTML = `
-      <div style="margin-bottom:0.6rem;"><b>Scenario &amp; Policy:</b> ${s.scenario} &mdash; <i>"${s.policy}"</i></div>
-      <div style="margin-bottom:0.6rem;"><b>Attack Family:</b> ${s.family} (${s.language})</div>
-      <div style="margin-bottom:0.6rem;"><b>Why the outcomes diverge:</b> ${s.divergence_reason}</div>
-      <div style="margin-bottom:0.6rem;"><b>Request Screening:</b> Heuristic Rules matched: <code>${(s.protected.request_shield.matched_rules || []).join(', ') || 'None'}</code> | Classifier Probability: <code>${s.protected.request_shield.score != null ? s.protected.request_shield.score : 'N/A'}</code> (threshold: ${s.protected.request_shield.threshold || '0.75'}).</div>
-      <div><b>Response Guard:</b> Interception action: <code>${s.protected.response_shield ? (s.protected.response_shield.matched_rule || s.protected.response_shield.action || 'clean_pass') : 'not_reached'}</code>. Safe synthetic response delivered to user without financial or privacy liability.</div>
+      <div style="margin-bottom:0.6rem;"><b>Scenario &amp; Policy:</b> ${esc(s.scenario)} &mdash; <i>"${esc(s.policy)}"</i></div>
+      <div style="margin-bottom:0.6rem;"><b>Attack Family:</b> ${esc(s.family)} (${esc(s.language)})</div>
+      <div style="margin-bottom:0.6rem;"><b>Why the outcomes diverge:</b> ${esc(s.divergence_reason)}</div>
+      <div style="margin-bottom:0.6rem;"><b>Request Screening:</b> Heuristic Rules matched: <code>${esc((s.protected.request_shield.matched_rules || []).join(', ') || 'None')}</code> | Classifier Probability: <code>${esc(s.protected.request_shield.score != null ? s.protected.request_shield.score : 'N/A')}</code> (threshold: ${s.protected.request_shield.threshold || '0.75'}).</div>
+      <div><b>Response Guard:</b> Interception action: <code>${esc(s.protected.response_shield ? (s.protected.response_shield.matched_rule || s.protected.response_shield.action || 'clean_pass') : 'not_reached')}</code>. Safe synthetic response delivered to user without financial or privacy liability.</div>
     `;
   }
 }
@@ -2064,60 +2103,60 @@ function renderDrawerTab(tab) {
     b.innerHTML = `
       <div class="drawer-section">
         <div class="drawer-section-title">Forensic Attack Information</div>
-        <div class="code-box">Test ID: ${t.test_id || 'Unavailable'}\nTrace ID: ${t.trace_id || 'TRC-' + (t.test_id || '8901')}\nRun ID: ${t.run_id || 'RUN-1023'}\nFamily: ${t.family || 'Unavailable'}\nLanguage: ${t.language || 'Unavailable'}\nTimestamp: ${t.time || 'Unavailable'}\nLatency: ${t.latency_ms != null ? t.latency_ms + ' ms' : 'Unavailable'}</div>
+        <div class="code-box">Test ID: ${esc(t.test_id || 'Unavailable')}\nTrace ID: ${esc(t.trace_id || 'TRC-' + (t.test_id || '8901'))}\nRun ID: ${esc(t.run_id || 'RUN-1023')}\nFamily: ${esc(t.family || 'Unavailable')}\nLanguage: ${esc(t.language || 'Unavailable')}\nTimestamp: ${esc(t.time || 'Unavailable')}\nLatency: ${esc(t.latency_ms != null ? t.latency_ms + ' ms' : 'Unavailable')}</div>
       </div>
       <div class="drawer-section">
         <div class="drawer-section-title">Execution Pipeline Trace</div>
-        <div class="code-box">Request Shield:  [${t.request_decision}]\nTarget Model:    [${t.model_execution || (t.request_decision === 'BLOCKED' ? 'NOT EXECUTED' : 'COMPLETED')}]\nResponse Shield: [${t.response_decision}]\nJudge Verdict:   [${t.judge_result}]</div>
+        <div class="code-box">Request Shield:  [${esc(t.request_decision)}]\nTarget Model:    [${esc(t.model_execution || (t.request_decision === 'BLOCKED' ? 'NOT EXECUTED' : 'COMPLETED'))}]\nResponse Shield: [${esc(t.response_decision)}]\nJudge Verdict:   [${esc(t.judge_result)}]</div>
       </div>
       <div class="drawer-section">
         <div class="drawer-section-title">Evaluated User Prompt</div>
-        <div class="code-box">${t.prompt || 'Unavailable'}</div>
+        <div class="code-box">${esc(t.prompt || 'Unavailable')}</div>
       </div>
       <div class="drawer-section">
         <div class="drawer-section-title">Final User-Visible Delivered Response</div>
-        <div class="code-box" style="color:var(--green);">${t.final_output || t.original_response || 'No response delivered.'}</div>
+        <div class="code-box" style="color:var(--green);">${esc(t.final_output || t.original_response || 'No response delivered.')}</div>
       </div>
     `;
   } else if (tab === 'request') {
     b.innerHTML = `
       <div class="drawer-section">
         <div class="drawer-section-title">Request Perimeter Shield Verdict</div>
-        <div class="code-box">Verdict: ${t.request_decision}\nDeciding Layer: ${t.deciding_layer || 'policy'}\nReason: ${t.reason || 'Screened at perimeter.'}</div>
+        <div class="code-box">Verdict: ${esc(t.request_decision)}\nDeciding Layer: ${esc(t.deciding_layer || 'policy')}\nReason: ${esc(t.reason || 'Screened at perimeter.')}</div>
       </div>
       <div class="drawer-section">
         <div class="drawer-section-title">ML Classifier &amp; Heuristic Signals</div>
-        <div class="code-box">ML Injection Score: ${t.score != null ? t.score : 'Unavailable'}\nClassifier Threshold: ${t.score_threshold != null ? t.score_threshold : '0.75'}\nMatched Heuristic Rules: ${t.matched_rules && t.matched_rules.length ? t.matched_rules.join(', ') : 'None'}\nPolicy Version: ${t.policy_version || 'v1.2'}</div>
+        <div class="code-box">ML Injection Score: ${esc(t.score != null ? t.score : 'Unavailable')}\nClassifier Threshold: ${esc(t.score_threshold != null ? t.score_threshold : '0.75')}\nMatched Heuristic Rules: ${esc(t.matched_rules && t.matched_rules.length ? t.matched_rules.join(', ') : 'None')}\nPolicy Version: ${esc(t.policy_version || 'v1.2')}</div>
       </div>
       <div class="drawer-section">
         <div class="drawer-section-title">Raw Input String</div>
-        <div class="code-box">${t.prompt || 'Unavailable'}</div>
+        <div class="code-box">${esc(t.prompt || 'Unavailable')}</div>
       </div>
     `;
   } else if (tab === 'response') {
     b.innerHTML = `
       <div class="drawer-section">
         <div class="drawer-section-title">Upstream Model Execution</div>
-        <div class="code-box">Execution Status: ${t.model_execution || (t.request_decision === 'BLOCKED' ? 'NOT EXECUTED' : 'COMPLETED')}\nRaw Upstream Reply: ${t.original_response != null ? t.original_response : 'Not executed — request blocked at perimeter'}</div>
+        <div class="code-box">Execution Status: ${esc(t.model_execution || (t.request_decision === 'BLOCKED' ? 'NOT EXECUTED' : 'COMPLETED'))}\nRaw Upstream Reply: ${esc(t.original_response != null ? t.original_response : 'Not executed — request blocked at perimeter')}</div>
       </div>
       <div class="drawer-section">
         <div class="drawer-section-title">Response Shield Policy Screening</div>
-        <div class="code-box">Verdict: ${t.response_decision}\nAction Check: ${t.deciding_layer === 'policy_response' ? 'Forbidden promise intercepted and withheld' : (t.response_decision === 'NOT REACHED' ? 'Stage not reached' : 'Output passed verification')}\nInterception Details: ${t.reason || 'No violations detected.'}</div>
+        <div class="code-box">Verdict: ${esc(t.response_decision)}\nAction Check: ${t.deciding_layer === 'policy_response' ? 'Forbidden promise intercepted and withheld' : (t.response_decision === 'NOT REACHED' ? 'Stage not reached' : 'Output passed verification')}\nInterception Details: ${esc(t.reason || 'No violations detected.')}</div>
       </div>
       <div class="drawer-section">
         <div class="drawer-section-title">Sanitized Delivery to End User</div>
-        <div class="code-box">${t.final_output || t.original_response || 'Refusal message delivered.'}</div>
+        <div class="code-box">${esc(t.final_output || t.original_response || 'Refusal message delivered.')}</div>
       </div>
     `;
   } else if (tab === 'judge') {
     b.innerHTML = `
       <div class="drawer-section">
-        <div class="drawer-section-title">Llama Judge Consensus Grading</div>
-        <div class="code-box">Judge Model: Llama 3.1 70B\nVerdict: ${t.judge_result}\nJudge Confidence: ${t.judge_confidence != null ? t.judge_confidence : '0.94'}\nEvaluation Status: ${t.judge_result.includes('Correct') ? 'PASS (Firewall acted correctly)' : 'AUDIT REQUIRED'}</div>
+        <div class="drawer-section-title">Judge Consensus Grading</div>
+        <div class="code-box">Judge Model: see pipeline header (demo or live run models)\nVerdict: ${esc(t.judge_result)}\nJudge Confidence: ${esc(t.judge_confidence != null ? t.judge_confidence : '0.94')}\nEvaluation Status: ${esc(t.judge_result.includes('Correct') ? 'PASS (Firewall acted correctly)' : 'AUDIT REQUIRED')}</div>
       </div>
       <div class="drawer-section">
         <div class="drawer-section-title">Security Boundary Verification Rationale</div>
-        <div class="code-box">${t.reason || 'Security firewall enforced operational boundary policy.'}</div>
+        <div class="code-box">${esc(t.reason || 'Security firewall enforced operational boundary policy.')}</div>
       </div>
     `;
   } else if (tab === 'timeline') {
@@ -2126,14 +2165,14 @@ function renderDrawerTab(tab) {
         <div class="timeline-dot">1</div>
         <div>
           <div style="font-weight:600; font-size:0.8rem;">Adversarial Probe Generated</div>
-          <div style="font-size:0.72rem; color:var(--text-muted);">${t.time || '10:24:00'} &bull; Synthesized probe for ${t.family || 'abuse scenario'} (${t.language || 'English'}).</div>
+          <div style="font-size:0.72rem; color:var(--text-muted);">${esc(t.time || '10:24:00')} &bull; Synthesized probe for ${esc(t.family || 'abuse scenario')} (${esc(t.language || 'English')}).</div>
         </div>
       </div>
       <div class="timeline-item">
         <div class="timeline-dot" style="border-color:${t.request_decision === 'BLOCKED' ? 'var(--red)' : 'var(--green)'};">2</div>
         <div>
           <div style="font-weight:600; font-size:0.8rem;">Request Shield Screening</div>
-          <div style="font-size:0.72rem; color:var(--text-muted);">Verdict: ${t.request_decision}. Deciding layer: ${t.deciding_layer}. Score: ${t.score != null ? t.score : 'N/A'}.</div>
+          <div style="font-size:0.72rem; color:var(--text-muted);">Verdict: ${esc(t.request_decision)}. Deciding layer: ${esc(t.deciding_layer)}. Score: ${esc(t.score != null ? t.score : 'N/A')}.</div>
         </div>
       </div>
       <div class="timeline-item">
@@ -2147,14 +2186,14 @@ function renderDrawerTab(tab) {
         <div class="timeline-dot" style="border-color:${t.response_decision === 'INTERCEPTED' ? 'var(--amber)' : (t.response_decision === 'NOT REACHED' ? 'var(--text-dim)' : 'var(--green)')};">4</div>
         <div>
           <div style="font-weight:600; font-size:0.8rem;">Response Shield Inspection</div>
-          <div style="font-size:0.72rem; color:var(--text-muted);">${t.response_decision === 'NOT REACHED' ? 'Stage not reached due to perimeter block.' : `Decision: ${t.response_decision}.`}</div>
+          <div style="font-size:0.72rem; color:var(--text-muted);">${t.response_decision === 'NOT REACHED' ? 'Stage not reached due to perimeter block.' : `Decision: ${esc(t.response_decision)}.`}</div>
         </div>
       </div>
       <div class="timeline-item">
         <div class="timeline-dot" style="border-color:${t.judge_result.includes('Correct') ? 'var(--green)' : 'var(--red)'};">5</div>
         <div>
-          <div style="font-weight:600; font-size:0.8rem;">Llama Judge Consensus Verdict</div>
-          <div style="font-size:0.72rem; color:var(--text-muted);">${t.judge_result} (Confidence: ${t.judge_confidence != null ? t.judge_confidence : '0.94'}). Evidence archived.</div>
+          <div style="font-weight:600; font-size:0.8rem;">Judge Consensus Verdict</div>
+          <div style="font-size:0.72rem; color:var(--text-muted);">${esc(t.judge_result)} (Confidence: ${esc(t.judge_confidence != null ? t.judge_confidence : '0.94')}). Evidence archived.</div>
         </div>
       </div>
     `;
@@ -2167,9 +2206,11 @@ $('#btnLaunchRun').onclick = runEvaluation;
 
 async function runEvaluation() {
   const btn = $('#btnRunEval');
+  const launchBtn = $('#btnLaunchRun');
   btn.disabled = true;
+  if (launchBtn) launchBtn.disabled = true;
   btn.innerHTML = '<span class="status-indicator"><span class="dot-live" style="background:var(--text-muted);"></span> Running security evaluation...</span>';
-  
+
   // Pipeline animation
   $('#pipeAttackState').textContent = 'GENERATING';
   $('#pipeAttackState').className = 'badge-pill neutral';
@@ -2181,10 +2222,30 @@ async function runEvaluation() {
       body: JSON.stringify({ mode: 'auto' })
     });
     const data = await res.json();
-    
+    if (!res.ok) {
+      throw new Error(data.error || ('Run failed with HTTP ' + res.status));
+    }
+
     // Animate stage completion
     $('#pipeAttackState').textContent = 'COMPLETED';
     $('#pipeAttackState').className = 'badge-pill allowed';
+
+    // Show the actual models used, never a hardcoded label.
+    // Demo runs use simulated probes, live runs use the trace models.
+    if (data.mode === 'demo_mode') {
+      const sm = $('#sidebarModel'); if (sm) sm.textContent = 'Demo (simulated)';
+      const pm = $('#pipeModel'); if (pm) pm.textContent = 'Demo (simulated)';
+      const pj = $('#pipeJudge'); if (pj) pj.textContent = 'Demo (simulated judge)';
+      const ss = $('#sidebarStatus'); if (ss) ss.textContent = 'Demo mode - local simulation';
+      const eb = $('#envBadge'); if (eb) eb.textContent = 'DEMO MODE';
+    } else if (data.models) {
+      const label = 'Gen ' + data.models.generator + ' / Target ' + data.models.target;
+      const sm = $('#sidebarModel'); if (sm) sm.textContent = label;
+      const pm = $('#pipeModel'); if (pm) pm.textContent = data.models.generator;
+      const pj = $('#pipeJudge'); if (pj) pj.textContent = data.models.judge;
+      const ss = $('#sidebarStatus'); if (ss) ss.textContent = 'Live run - ' + (data.provider_base_url || 'env provider');
+      const eb = $('#envBadge'); if (eb) eb.textContent = 'LIVE RUN';
+    }
 
     // Update scoreboard and failure summary dynamically from run results
     if (data.summary) {
@@ -2243,11 +2304,14 @@ async function runEvaluation() {
       }
     }
 
-    alert('Security Evaluation Complete: Verity Dual Shield tested across all active families. Traces updated.');
+    // Success is visible in the scorecard and event feed. No alert needed.
   } catch (err) {
+    $('#pipeAttackState').textContent = 'ERROR';
+    $('#pipeAttackState').className = 'badge-pill error';
     alert('Evaluation error: ' + err.message);
   } finally {
     btn.disabled = false;
+    if (launchBtn) launchBtn.disabled = false;
     btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run security evaluation';
   }
 }
@@ -2315,9 +2379,39 @@ class Handler(BaseHTTPRequestHandler):
         if self.path not in ("/run", "/api/run"):
             self.send_error(404)
             return
-        content_len = int(self.headers.get("Content-Length", 0))
-        post_data = self.rfile.read(content_len) if content_len > 0 else b"{}"
         try:
+            content_len = int(self.headers.get("Content-Length", 0))
+        except (TypeError, ValueError):
+            self.send_error(400, "bad Content-Length")
+            return
+        if content_len < 0 or content_len > _MAX_BODY_BYTES:
+            self.send_error(413, "request body too large")
+            return
+        token = os.environ.get("REDTEAM_CONSOLE_TOKEN")
+        if token and self.headers.get("X-Redteam-Token") != token:
+            self.send_error(401, "console token required")
+            return
+        if not _RUN_LOCK.acquire(blocking=False):
+            body = json.dumps({"error": "a run is already in progress"}).encode("utf-8")
+            self.send_response(409)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        try:
+            now = time.time()
+            _RUN_TIMES[:] = [t for t in _RUN_TIMES if now - t < 60]
+            if len(_RUN_TIMES) >= _MAX_RUNS_PER_MINUTE:
+                body = json.dumps({"error": "rate limited: too many runs per minute"}).encode("utf-8")
+                self.send_response(429)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            _RUN_TIMES.append(now)
+            post_data = self.rfile.read(content_len) if content_len > 0 else b"{}"
             payload = json.loads(post_data.decode("utf-8")) if post_data else {}
             policy = payload.get("policy")
             families = payload.get("families")
@@ -2334,6 +2428,8 @@ class Handler(BaseHTTPRequestHandler):
         else:
             body = json.dumps(run).encode("utf-8")
             self.send_response(200)
+        finally:
+            _RUN_LOCK.release()
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
