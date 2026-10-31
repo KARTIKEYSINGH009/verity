@@ -2230,11 +2230,17 @@ async function runEvaluation() {
   try {
     // Wire the scenario dropdown into the Run: previously this posted
     // only mode:auto, so every scenario used the retail default policy.
-    const scen = (APP_STATE.fixtures && APP_STATE.fixtures.scenarios && APP_STATE.fixtures.scenarios[APP_STATE.activeScenario]) || null;
+    // Use the scenario from either dropdown: the header dropdown and
+    // the Run Tests dropdown were not synced before, so a choice made
+    // in Run Tests was silently ignored by Run.
+    const rtSel = document.getElementById('rtScenarioSelect');
+    const chosenScenario = (rtSel && rtSel.value) ? rtSel.value : APP_STATE.activeScenario;
+    APP_STATE.activeScenario = chosenScenario;
+    const scen = (APP_STATE.fixtures && APP_STATE.fixtures.scenarios && APP_STATE.fixtures.scenarios[chosenScenario]) || null;
     const res = await fetch('/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'auto', scenario: APP_STATE.activeScenario, policy: scen ? scen.policy : null })
+      body: JSON.stringify({ mode: 'auto', scenario: chosenScenario, policy: scen ? scen.policy : null })
     });
     const data = await res.json();
     if (!res.ok) {
@@ -2353,6 +2359,16 @@ function applyPreset(name) {
 $('#activeScenario').onchange = (e) => {
   const id = e.target.value;
   APP_STATE.activeScenario = id;
+  const rt = document.getElementById('rtScenarioSelect'); if (rt) rt.value = id;
+  if (APP_STATE.fixtures && APP_STATE.fixtures.scenarios[id]) {
+    $('#rtPolicyText').value = APP_STATE.fixtures.scenarios[id].policy;
+  }
+};
+const rtSelEl = document.getElementById('rtScenarioSelect');
+if (rtSelEl) rtSelEl.onchange = (e) => {
+  const id = e.target.value;
+  APP_STATE.activeScenario = id;
+  const hd = document.getElementById('activeScenario'); if (hd) hd.value = id;
   if (APP_STATE.fixtures && APP_STATE.fixtures.scenarios[id]) {
     $('#rtPolicyText').value = APP_STATE.fixtures.scenarios[id].policy;
   }
