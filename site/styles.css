@@ -403,7 +403,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 24px; color: 
 
 /* --- hybrid components (Layout 1 structure, token system) --- */
 .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 700; font-size: 1.06rem; letter-spacing: -.01em; }
-.brand-mark { width: 31px; height: 31px; border-radius: var(--r-md); background: var(--accent); color: var(--bg); display: grid; place-items: center; flex: none; }
+.brand-mark { width: 31px; height: 31px; border-radius: var(--r-md); background: #4FBF8A; color: #0A0D0B; display: grid; place-items: center; flex: none; }
 .brand-mark svg { width: 19px; height: 19px; }
 .top-actions { display: inline-flex; align-items: center; gap: 14px; }
 .chip { font-family: var(--mono); font-size: .7rem; font-weight: 600; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
