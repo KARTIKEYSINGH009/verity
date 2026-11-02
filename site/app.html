@@ -177,10 +177,49 @@
           return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
         });
       }
-      fetch('/v1/me').then(function (r) {
-        if (!r.ok) { location.href = '/login'; throw new Error('auth'); }
-        return r.json();
-      }).then(function (me) {
+      var loadRedirecting = false;
+      function showLoadError(message) {
+        document.getElementById('plan-line').textContent = message;
+        document.getElementById('who-email').textContent = 'Not loaded';
+        var actions = document.getElementById('load-error-actions');
+        if (!actions) {
+          actions = document.createElement('div');
+          actions.id = 'load-error-actions';
+          actions.style.marginTop = '12px';
+          var planLine = document.getElementById('plan-line');
+          planLine.parentNode.insertBefore(actions, planLine.nextSibling);
+        }
+        actions.innerHTML = '';
+        var retry = document.createElement('button');
+        retry.type = 'button';
+        retry.className = 'button';
+        retry.textContent = 'Try again';
+        retry.addEventListener('click', function () {
+          document.getElementById('plan-line').textContent = 'Loading your account…';
+          document.getElementById('who-email').textContent = 'Loading…';
+          actions.innerHTML = '';
+          loadAccount();
+        });
+        var signin = document.createElement('button');
+        signin.type = 'button';
+        signin.className = 'button secondary';
+        signin.style.marginLeft = '8px';
+        signin.textContent = 'Sign in again';
+        signin.addEventListener('click', function () { location.href = '/login'; });
+        actions.appendChild(retry);
+        actions.appendChild(signin);
+      }
+      function loadAccount() {
+        var controller = new AbortController();
+        var timer = setTimeout(function () { controller.abort(); }, 45000);
+        fetch('/v1/me', { signal: controller.signal }).then(function (r) {
+          clearTimeout(timer);
+          if (!r.ok) {
+            if (r.status === 401) { loadRedirecting = true; location.href = '/login'; throw new Error('auth'); }
+            throw new Error('server');
+          }
+          return r.json();
+        }).then(function (me) {
         document.getElementById('who-company').textContent = me.user.company || 'Personal workspace';
         document.getElementById('who-email').textContent = me.user.email;
         document.getElementById('plan-line').textContent =
@@ -255,7 +294,16 @@
               '<span>' + verdict + faith + '</span></div>';
           }).join('');
         }
-      }).catch(function () { /* redirect handled */ });
+      }).catch(function (e) {
+        if (loadRedirecting) { return; }
+        if (e && e.name === 'AbortError') {
+          showLoadError('Loading timed out after 45 seconds — the database may still be waking up. Please try again.');
+        } else {
+          showLoadError('Could not load your account just now. Please try again.');
+        }
+      });
+      }
+      loadAccount();
 
       document.getElementById('regen-btn').addEventListener('click', async function () {
         if (!confirm('Regenerate your API key? The current key stops working immediately.')) return;
