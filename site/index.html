@@ -19,6 +19,15 @@
   <meta name="twitter:description" content="Verity — an AI firewall for LLM apps. Screens prompts for injection attacks, enforces business policy, grades answers for faithfulness, logs every request." />
   <meta name="twitter:image" content="https://verity-nine-flame.vercel.app/og-image.png" />
   <link rel="stylesheet" href="/styles.css" />
+  <style>
+    /* Homepage emerald restyle — homepage only, other pages untouched. */
+    .hero .button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .hero .button.primary:hover, .hero .button.primary:active { background: var(--accent-strong); border-color: var(--accent-strong); }
+    @media (prefers-color-scheme: dark) {
+      .hero .button.primary, .hero .button.primary:hover, .hero .button.primary:active { color: #0A0D0B; }
+    }
+    .stats-grid .stat strong { color: var(--accent); }
+  </style>
 </head>
 <body>
     <header class="topbar">
@@ -45,7 +54,7 @@
       <section class="hero" aria-labelledby="hero-title">
         <div>
           <p class="kicker">The AI security gateway</p>
-          <h1 id="hero-title">Every model call.<br />Screened, evaluated, traced.</h1>
+          <h1 id="hero-title">Every model call.<br />Screened, evaluated, <span style="color:var(--accent)">traced.</span></h1>
           <p class="hero-copy">Verity sits between your application and any LLM provider to detect prompt attacks, enforce your policies, evaluate answer groundedness, and give you full visibility into every request.</p>
           <div class="hero-actions" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:26px">
             <a class="button primary" href="/pilot">Start a pilot</a>
