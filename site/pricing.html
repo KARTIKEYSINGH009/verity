@@ -29,6 +29,25 @@
        closer to the tier cards above; the label column stays narrow. Scrolls on mobile. */
     .compare-matrix.compare-plans { table-layout: fixed; min-width: 720px; }
     .compare-matrix.compare-plans th:first-child, .compare-matrix.compare-plans td:first-child { width: 220px; }
+    /* Compare table polish: feature names in ink, and the Growth (Recommended)
+       column tinted so it reads as the recommended one, like the featured card. */
+    .compare-matrix.compare-plans td:first-child { color: var(--ink); font-weight: 600; }
+    .compare-matrix.compare-plans th:nth-child(3), .compare-matrix.compare-plans td:nth-child(3) { background: var(--accent-soft); }
+    .compare-matrix.compare-plans th:nth-child(3) { color: var(--accent-strong); }
+    /* Key-value terms: a bordered card of label/value rows, not a raw table. */
+    .terms { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden; }
+    .terms .term { display: grid; grid-template-columns: 240px 1fr; gap: 16px; padding: 14px 20px; }
+    .terms .term + .term { border-top: 1px solid var(--line); }
+    .terms .term b { font-weight: 650; color: var(--ink); }
+    .terms .term span { color: var(--muted); }
+    @media (max-width: 640px) { .terms .term { grid-template-columns: 1fr; gap: 2px; } }
+    /* FAQ: the homepage pattern — hairline rows with a + / – toggle, not bare text. */
+    .faq-list details { border-bottom: 1px solid var(--line); padding: 20px 0; }
+    .faq-list details summary { cursor: pointer; font-size: 1rem; font-weight: 500; color: var(--ink); list-style: none; display: flex; justify-content: space-between; align-items: center; }
+    .faq-list details summary::-webkit-details-marker { display: none; }
+    .faq-list details summary::after { content: "+"; color: var(--accent); font-size: 1.3rem; font-weight: 400; margin-left: 16px; flex: none; }
+    .faq-list details[open ] summary::after { content: "–"; }
+    .faq-list details p { margin: 16px 0 0; color: var(--muted); font-size: .92rem; line-height: 1.75; max-width: 760px; }
     /* Header layout: the shared stylesheet carries no .site-header rules, so this
        page defines its own top bar, mirroring the homepage's .topbar (flat, no blur). */
     .site-header { border-bottom: 1px solid var(--line); background: var(--surface); }
@@ -57,8 +76,10 @@
     .guarantee { margin-top: 24px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); }
     .guarantee p { margin: 0; }
     .price-hero { padding: 96px 0 32px; }
-    .price-hero h1 { max-width: 900px; }
+    .price-hero h1 { max-width: 680px; font-family: "Playfair Display", Georgia, "Iowan Old Style", serif; font-weight: 600; font-size: clamp(2.4rem, 5vw, 3.4rem); line-height: 1.12; letter-spacing: -.01em; }
+    .price-hero h1 .accent { color: var(--accent-strong); font-style: italic; }
     .price-hero p { max-width: 720px; }
+    .price-hero .section-lede { max-width: 560px; font-size: 1.09rem; line-height: 1.7; }
     .kicker { font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
   </style>
 </head>
@@ -87,7 +108,7 @@
     <section class="price-hero">
       <div class="container">
         <p class="kicker">Pricing</p>
-        <h1>Enterprise-grade AI security. Transparent pricing. Protection that scales with your business.</h1>
+        <h1>Enterprise-grade AI security. <span class="accent">Transparent pricing.</span> Protection that scales with your business.</h1>
         <p class="section-lede">Monthly subscriptions, billed in advance. Start free, or start a pilot — paid plans are arranged with the founder, not bought here.</p>
 
         <div class="price-grid">
@@ -252,17 +273,14 @@
     <section class="section">
       <div class="container">
         <div class="section-head"><h2>Additional usage and overages.</h2><p class="section-lede">Not available at launch.</p></div>
-        <div class="table-scroll"><table class="compare-matrix">
-          <thead><tr><th>Item</th><th>Current policy</th></tr></thead>
-          <tbody>
-            <tr><td>Included usage</td><td>Depends on subscription</td></tr>
-            <tr><td>Usage alert</td><td>Planned at 80%</td></tr>
-            <tr><td>Quota reached</td><td>Requests stop</td></tr>
-            <tr><td>API response</td><td>HTTP 429 quota_exceeded</td></tr>
-            <tr><td>Paid extra usage</td><td>Not available yet</td></tr>
-            <tr><td>Automatic extra charges</td><td>Not permitted</td></tr>
-          </tbody>
-        </table></div>
+        <div class="terms">
+          <div class="term"><b>Included usage</b><span>Depends on subscription</span></div>
+          <div class="term"><b>Usage alert</b><span>Planned at 80%</span></div>
+          <div class="term"><b>Quota reached</b><span>Requests stop</span></div>
+          <div class="term"><b>API response</b><span>HTTP 429 quota_exceeded</span></div>
+          <div class="term"><b>Paid extra usage</b><span>Not available yet</span></div>
+          <div class="term"><b>Automatic extra charges</b><span>Not permitted</span></div>
+        </div>
         <p class="fine">When you reach your monthly quota, requests stop until the next billing month. Opt-in overages and usage alerts are planned for a future release.</p>
         <p class="fine">If you need headroom now, <a href="/pilot#request">talk to us</a>.</p>
       </div>
@@ -271,20 +289,17 @@
     <section class="section">
       <div class="container">
         <div class="section-head"><h2>Billing and commercial terms.</h2></div>
-        <div class="table-scroll"><table class="compare-matrix">
-          <thead><tr><th>Item</th><th>Policy</th></tr></thead>
-          <tbody>
-            <tr><td>Subscription billing</td><td>Monthly, in advance</td></tr>
-            <tr><td>Annual discount</td><td>Conditional: 12 months for the price of 10</td></tr>
-            <tr><td>Annual eligibility</td><td>Only after cost and support validation</td></tr>
-            <tr><td>Annual payment</td><td>Upfront</td></tr>
-            <tr><td>Model-provider costs</td><td>Customer brings their own API key</td></tr>
-            <tr><td>Checkout</td><td>Founder-arranged initially</td></tr>
-            <tr><td>Enterprise contracts</td><td>Custom agreement</td></tr>
-            <tr><td>Dedicated deployment</td><td>Separately scoped and quoted</td></tr>
-            <tr><td>Custom development</td><td>Separately quoted</td></tr>
-          </tbody>
-        </table></div>
+        <div class="terms">
+          <div class="term"><b>Subscription billing</b><span>Monthly, in advance</span></div>
+          <div class="term"><b>Annual discount</b><span>Conditional: 12 months for the price of 10</span></div>
+          <div class="term"><b>Annual eligibility</b><span>Only after cost and support validation</span></div>
+          <div class="term"><b>Annual payment</b><span>Upfront</span></div>
+          <div class="term"><b>Model-provider costs</b><span>Customer brings their own API key</span></div>
+          <div class="term"><b>Checkout</b><span>Founder-arranged initially</span></div>
+          <div class="term"><b>Enterprise contracts</b><span>Custom agreement</span></div>
+          <div class="term"><b>Dedicated deployment</b><span>Separately scoped and quoted</span></div>
+          <div class="term"><b>Custom development</b><span>Separately quoted</span></div>
+        </div>
         <p class="fine">Your model bill stays yours. You pay your own model-provider bill separately — you bring your own key. Verity's price covers the security layer, policy enforcement, traces, and support, never your model spend.</p>
       </div>
     </section>
@@ -293,7 +308,7 @@
       <div class="container">
         <div class="section-head"><h2>Frequently asked questions.</h2></div>
         <div class="faq-list">
-          <details><summary>What happens when I hit my limit?</summary><p>Requests stop at your quota — the gateway returns a <code>429 quota_exceeded</code> response until the next billing month. Paid extra usage is not available yet, and automatic extra charges are not permitted.</p></details>
+          <details open><summary>What happens when I hit my limit?</summary><p>Requests stop at your quota — the gateway returns a <code>429 quota_exceeded</code> response until the next billing month. Paid extra usage is not available yet, and automatic extra charges are not permitted.</p></details>
           <details><summary>What counts as a request?</summary><p>One request is one inbound application request processed through Verity — not every internal model call, retry, or evaluation step. A request Verity blocks still counts, because the screening work was done.</p></details>
           <details><summary>What if the assessment finds nothing?</summary><p>You pay nothing. If an assessment finds nothing material — no successful attacks and no exploitable issue — there is no fee. If our attacks succeed, you pay the assessment fee and we recommend Verity as the fix.</p></details>
           <details><summary>Do I pay for my model's usage too?</summary><p>No. You bring your own model-provider API key and pay your own model bill. Verity's price is for the security layer, policy enforcement, traces, and support — never for your model spend.</p></details>
