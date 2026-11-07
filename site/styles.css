@@ -368,7 +368,10 @@ footer .wrap { display: flex; justify-content: space-between; gap: 24px; color: 
   .wrap { width: min(100% - 30px, 1180px); }
   nav a:not(:last-child) { display: none; }
   nav { gap: 0; }
-  .topbar .wrap { min-height: 56px; }
+  .topbar .wrap { min-height: 56px; gap: 12px; }
+  .top-actions { gap: 10px; }
+  .top-actions a[data-auth="start"] { display: none; }
+  .topbar .button { width: auto; white-space: nowrap; flex: none; }
   .hero { min-height: auto; padding: 52px 0 48px; gap: 36px; }
   h1 { font-size: clamp(2.2rem, 11vw, 3rem); }
   .hero-copy { margin-top: 20px; font-size: 1.05rem; }
@@ -411,7 +414,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 24px; color: 
 .gh-link { display: inline-flex; align-items: center; gap: 7px; text-decoration: none; font-size: .88rem; font-weight: 600; color: var(--muted); }
 .gh-link:hover { color: var(--ink); }
 .gh-link svg { width: 18px; height: 18px; }
-.btn-small { min-height: 38px; padding: 7px 14px; font-size: .86rem; }
+.btn-small { min-height: 38px; padding: 7px 14px; font-size: .86rem; white-space: nowrap; }
 
 .ticks { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 30px; }
 .tick { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: .87rem; font-weight: 550; }
