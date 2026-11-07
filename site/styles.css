@@ -6,7 +6,7 @@
   --ink: #0d130f;
   --muted: #55615a;
   --line: #dfe4df;
-  --line-strong: #b7c0b8;
+  --line-strong: #8a948c;
   --accent: #0a6b4e;
   --accent-strong: #085c42;
   --accent-soft: #e4f0e9;
@@ -19,8 +19,50 @@
   --band-ink: #e9efea;
   --r-sm: 4px;
   --r-md: 8px;
+  --r-card: 14px;
   --sans: "Segoe UI Variable", "Aptos", "Helvetica Neue", Arial, sans-serif;
   --mono: "SFMono-Regular", "Cascadia Code", "Liberation Mono", monospace;
+  /* Phase 1 — type scale (sizes actually used across the site; serif display
+     lives in the page that uses it, see pricing.html). */
+  --text-display: clamp(2.4rem, 5vw, 3.4rem);
+  --text-h1: clamp(2.55rem, 4.6vw, 3.9rem);
+  --text-h2: clamp(1.9rem, 3.6vw, 2.9rem);
+  --text-h3: 1.45rem;
+  --text-title: 1.3rem;
+  --text-card-title: 1.12rem;
+  --text-lede: 1.05rem;
+  --text-hero-lede: 1.09rem;
+  --text-body: 1rem;
+  --text-small: .92rem;
+  --text-caption: .82rem;
+  --text-label: .78rem;
+  --text-micro: .72rem;
+  /* Phase 1 — spacing scale (4px base) and layout measures. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-14: 56px;
+  --space-16: 64px;
+  --space-24: 96px;
+  --container-w: 1180px;
+  --section-pad: 64px;
+  --header-h: 72px;
+  --measure: 720px;
+  --measure-wide: 760px;
+  --measure-hero: 680px;
+  --measure-lede: 560px;
+  --compare-label-w: 220px;
+  --term-label-w: 240px;
+  --table-min-w: 720px;
+  --badge-offset: 11px;
+  --tracking-wide: .12em;
+  --tracking-label: .08em;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -31,7 +73,7 @@
     --ink: #ecf1ec;
     --muted: #a4b0a5;
     --line: #242c25;
-    --line-strong: #49544a;
+    --line-strong: #5a665b;
     --accent: #4fbf8a;
     --accent-strong: #6bd3a1;
     --accent-soft: #142a1f;
@@ -145,7 +187,7 @@ h1 {
   transition: background .15s ease, color .15s ease, border-color .15s ease;
 }
 .button.primary { background: var(--ink); color: var(--bg); }
-.button.primary:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+.button.primary:hover { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 .button.primary:active { background: var(--accent-strong); border-color: var(--accent-strong); }
 .button.secondary { border-color: var(--line-strong); color: var(--ink); background: var(--surface); }
 .button.secondary:hover { border-color: var(--ink); }
@@ -279,7 +321,7 @@ textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in
   cursor: pointer;
   transition: background .15s ease, border-color .15s ease;
 }
-.run:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+.run:hover { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 .run:active { background: var(--accent-strong); border-color: var(--accent-strong); }
 .run:disabled { opacity: .55; cursor: wait; }
 .result-empty { color: var(--muted); max-width: 380px; margin-top: 34px; }
@@ -584,14 +626,14 @@ footer .wrap { display: flex; justify-content: space-between; gap: 24px; color: 
 .panel p { color: var(--muted); font-size: .95rem; }
 
 /* Pricing plan cards: equal-height, CTAs aligned at the bottom. */
-.price-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 40px; align-items: stretch; }
-.price-card { border: 1px solid var(--line-strong); border-radius: 12px; padding: 24px; background: var(--surface); display: flex; flex-direction: column; }
-.price-card > b { font-size: 1.12rem; font-weight: 650; letter-spacing: -.015em; }
-.price-card .amt { font-size: 1.45rem; color: var(--ink); margin: 10px 0 2px; }
-.price-card .amt span { font-size: .92rem; color: var(--muted); }
-.price-card p { color: var(--muted); font-size: .93rem; }
-.price-card ul { list-style: none; margin: 14px 0 20px; padding: 0; display: grid; gap: 8px; color: var(--muted); font-size: .93rem; }
-.price-card ul li::before { content: "✓"; margin-right: 8px; color: var(--accent); font-weight: 700; }
+.price-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-5); margin-top: var(--space-10); align-items: stretch; }
+.price-card { border: 1px solid var(--line-strong); border-radius: var(--r-card); padding: var(--space-6); background: var(--surface); display: flex; flex-direction: column; }
+.price-card > b { font-size: var(--text-card-title); font-weight: 650; letter-spacing: -.015em; }
+.price-card .amt { font-size: var(--text-h3); color: var(--ink); margin: var(--space-3) 0 var(--space-1); }
+.price-card .amt span { font-size: var(--text-small); color: var(--muted); }
+.price-card p { color: var(--muted); font-size: var(--text-small); }
+.price-card ul { list-style: none; margin: var(--space-4) 0 var(--space-5); padding: 0; display: grid; gap: var(--space-2); color: var(--muted); font-size: var(--text-small); }
+.price-card ul li::before { content: "✓"; margin-right: var(--space-2); color: var(--accent); font-weight: 700; }
 .price-card .cta { margin-top: auto; }
 .price-card .cta .button { width: 100%; text-align: center; }
 @media (max-width: 860px) { .price-grid { grid-template-columns: 1fr; } }
