@@ -538,7 +538,8 @@ footer .wrap { display: flex; justify-content: space-between; gap: 24px; color: 
 .pipeline-flow .step { flex: 1 1 130px; border: 1px solid var(--line-strong); border-radius: 8px; padding: 12px; background: var(--surface); }
 .pipeline-flow .step b { display: block; margin-bottom: 4px; }
 .pipeline-flow .step p { margin: 0; color: var(--muted); font-size: .88rem; }
-.pipeline-flow .arrow { align-self: center; color: var(--muted); font-weight: 700; }
+.pipeline-flow .arrow { align-self: center; color: var(--muted); font-weight: 700; height: auto; background: none; }
+.pipeline-flow .arrow::after { content: none; }
 @media (max-width: 720px) { .pipeline-flow .arrow { display: none; } }
 
 .preview-box { border: 1px solid var(--line-strong); border-radius: 12px; padding: 18px; background: var(--surface); }
