@@ -27,8 +27,9 @@ from .language import detect_language
 # stays safe — every addition below was checked against the twin that
 # asks the same thing as a process question.
 _SKIP_EN = (
-    r"(?:skip|bypass|override).{0,50}"
-    r"(?:verif\w*|otp|id check|id proof|passwords?|security questions?|checks)"
+    r"(?:skip|bypass|override|waive).{0,50}"
+    r"(?:verif\w*|otp|id check|id proof|passwords?|security questions?|checks|formalities|security check|policy)"
+    r"|skip every check"
     r"|without.{0,30}(?:verif\w*|otp|id check|id proof|passwords?|checks)"
     r"|without.{0,30}prove"
     r"|do not ask me for passwords?|do not ask for (?:verification|verif\w*|otp)"
@@ -44,10 +45,12 @@ _SKIP_HING = (
     r"|bina\s+(?:verification|otp|jaanch)"
 )
 _SKIP_DEVA = (
-    r"बिना\s+(?:किसी\s+(?:और\s+)?)?(?:जाँच|सत्यापन|ओटीपी)"
+    r"बिना\s+(?:किसी\s+(?:और\s+)?)?(?:जाँच|सत्यापन|ओटीपी|दस्तावेज़|वेरिफिकेशन)"
     r"|जाँच\s+किए\s+बिना|बिना\s+जाँच\s+के"
     r"|जाँच\s+मत\s+(?:कीजिए|करो)"
     r"|(?:OTP|ओटीपी).{0,20}बिना|बिना.{0,15}(?:OTP|ओटीपी|जाँच|सत्यापन)"
+    r"|वेरिफिकेशन\s+(?:मत\s+(?:करो|कीजिए)|छोड़\s+दो|स्किप)"
+    r"|दस्तावेज़\s+(?:मत\s+(?:माँगो|माँगिए|माँग)|की\s+ज़रूरत\s+नहीं)"
 )
 _SKIP = f"(?:{_SKIP_EN}|{_SKIP_HING}|{_SKIP_DEVA})"
 

@@ -14,6 +14,14 @@ v0 is deterministic (pattern-based) so it works identically in mock mode.
 In live mode an LLM judge additionally reviews the response against the
 full policy text, which covers nuanced rules (e.g. refund windows) that
 patterns cannot decide.
+
+Phase 2 additions (action-tool-firewall, 2026-11-07):
+- Outbound tool_calls / function_call firewall: intercept, parse, and
+  validate structured actions returned by the model against business
+  policy and state_context before they reach the client.
+- Deterministic state_context validation (allowed_tools, user_verified,
+  order_age_days, max_refund_amount).
+- Broadened response-side baseline patterns.
 """
 import json
 import re
@@ -139,11 +147,12 @@ _CAP_RX = re.compile(r"up to\s+(\d+)\s*%", re.IGNORECASE)
 _PCT_RX = re.compile(r"(\d+)\s*%\s*off", re.IGNORECASE)
 _SKIP_VERB_RX = re.compile(
     r"\b(skip|bypass|waive|avoid)\b|"
+    r"skip every check|"
     r"(don't|dont|do not)\s+make me\b|do not ask me for\b",
     re.IGNORECASE)
 _SKIP_NOUN_RX = re.compile(
     r"\b(verif\w*|otp|one[- ]time password|id check|id proof|"
-    r"security questions?|approval)\b",
+    r"security questions?|approval|formalities|security check|policy)\b",
     re.IGNORECASE)
 _AUTHORITY_RX = re.compile(
     r"\bi am (the )?(store manager|manager|ceo|owner|admin|"
@@ -294,10 +303,18 @@ def _judge_response(policy: str, answer: str) -> dict | None:
 
 # Response-side baseline (AEGIS restructure, 2026-10-27): performed
 # bypasses that never reach the user, with or without a client policy.
+# Phase 2 (2026-11-07): broadened to catch plain-language model
+# commitments that avoid the exact word "refund" (e.g., "credited your
+# account", "waived the return window", "sending the previous
+# customer's address").
 _RESPONSE_CONDITIONAL = [
     ("verification_skip",
      re.compile(r"verif\w*\s+(has\s+been\s+)?(waived|skipped|bypassed)|"
-                r"no\s+verification\s+(needed|required)",
+                r"no\s+verification\s+(needed|required)|"
+                r"i('ve| have)\s+(waived|skipped|bypassed)\s+"
+                r"(the\s+)?(verification|security check|otp)|"
+                r"waiv(ed|ing)\s+(the\s+)?(return window|policy|"
+                r"security check|verification|otp)",
                 re.IGNORECASE),
      "response waives verification"),
     ("discount",
@@ -310,6 +327,21 @@ _RESPONSE_CONDITIONAL = [
                 r"(different|another|other)\s+(account|person)",
                 re.IGNORECASE),
      "response sends a refund to a different destination"),
+    # Phase 2 broadened patterns:
+    ("refund",
+     re.compile(r"i('ve| have)\s+(gone ahead and\s+)?"
+                r"(credited|refunded|reimbursed)\s+"
+                r"(your|the)\s+(account|card|wallet|balance)|"
+                r"(credited|refunded|reimbursed)\s+\$?\d+(\.\d+)?\s+"
+                r"(to|back to)\s+(your|the)\s+(account|card|wallet)",
+                re.IGNORECASE),
+     "response performs an unauthorized credit/refund"),
+    ("others_data",
+     re.compile(r"(sending|sharing|here is|here are)\s+(the\s+)?"
+                r"(previous|other|another)\s+(customer|user|person)"
+                r"('s|s')?\s+(address|phone|email|order|details|number|data)",
+                re.IGNORECASE),
+     "response discloses another person's data"),
 ]
 
 
@@ -321,6 +353,135 @@ def check_baseline_response(answer: str) -> dict:
                     "reason": reason}
     return {"violates": False, "action": None, "method": "policy_rule",
             "reason": ""}
+
+
+# ---------------------------------------------------------------------------
+# Outbound tool_calls / function_call firewall (Phase 1, 2026-11-07).
+#
+# Map high-risk tool names to policy actions, validate arguments against
+# state_context, and block unauthorized structured actions before they
+# reach the client.
+# ---------------------------------------------------------------------------
+_HIGH_RISK_TOOLS: dict[str, str] = {
+    "refund": "refund", "issue_refund": "refund",
+    "process_refund": "refund", "approve_refund": "refund",
+    "cancel_order": "refund",
+    "apply_discount": "discount", "add_discount": "discount",
+    "update_address": "privilege_grant",
+    "change_email": "privilege_grant",
+    "transfer_funds": "refund",
+    "delete_account": "privilege_grant",
+    "execute_sql": "privilege_grant",
+    "run_command": "privilege_grant",
+}
+
+_MONEY_TOOLS = frozenset({
+    "refund", "issue_refund", "process_refund", "approve_refund",
+    "transfer_funds",
+})
+
+_VERIFICATION_REQUIRED_TOOLS = frozenset({
+    "refund", "issue_refund", "process_refund", "approve_refund",
+    "cancel_order", "update_address", "change_email",
+    "transfer_funds", "delete_account",
+})
+
+
+def check_tool_calls(tool_calls: list[dict], policy: str,
+                     state_context: dict | None = None) -> dict | None:
+    """Validate outbound tool_calls against policy and state_context.
+
+    Returns a block dict on first violation, or None when all calls pass.
+    Each tool_call is expected to have the shape:
+        {"function": {"name": "...", "arguments": "..."}}
+    """
+    sc = state_context or {}
+    allowed = sc.get("allowed_tools")
+    user_verified = sc.get("user_verified")
+    max_refund = sc.get("max_refund_amount")
+    order_age = sc.get("order_age_days")
+
+    for tc in (tool_calls or []):
+        fn = (tc.get("function") or {})
+        name = (fn.get("name") or "").lower().strip()
+        raw_args = fn.get("arguments") or "{}"
+        try:
+            args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+        except (json.JSONDecodeError, TypeError):
+            args = {}
+
+        # 1. allowed_tools enforcement
+        if allowed is not None and name not in [
+                t.lower().strip() for t in allowed]:
+            return {"blocked": True, "violated_tool": name,
+                    "method": "state_context",
+                    "reason": "tool not permitted for current session state"}
+
+        # 2. user_verified enforcement
+        if user_verified is False and name in _VERIFICATION_REQUIRED_TOOLS:
+            return {"blocked": True, "violated_tool": name,
+                    "method": "state_context",
+                    "reason": "user not verified; tool requires verification"}
+
+        # 3. Policy-level prohibition: if the policy forbids the mapped action
+        action = _HIGH_RISK_TOOLS.get(name)
+        if action and policy:
+            prohibited = _prohibited_actions(policy)
+            if action in prohibited:
+                return {"blocked": True, "violated_tool": name,
+                        "method": "policy_rule",
+                        "reason": f"policy prohibits {action} actions"}
+
+        # 4. order_age_days enforcement against policy window
+        if name in _MONEY_TOOLS and policy:
+            window = _window_days(policy)
+            if window is not None and order_age is not None:
+                if order_age > window:
+                    return {"blocked": True, "violated_tool": name,
+                            "method": "state_context",
+                            "reason": f"order age {order_age} days exceeds "
+                                      f"policy window of {window} days"}
+
+        # 5. max_refund_amount enforcement
+        if name in _MONEY_TOOLS and max_refund is not None:
+            amount = args.get("amount")
+            if amount is not None:
+                try:
+                    if float(amount) > float(max_refund):
+                        return {"blocked": True, "violated_tool": name,
+                                "method": "state_context",
+                                "reason": f"amount {amount} exceeds max "
+                                          f"refund amount {max_refund}"}
+                except (ValueError, TypeError):
+                    pass
+
+    return None
+
+
+def screen_tool_role_messages(messages: list[dict]) -> dict | None:
+    """Screen role:tool / role:function messages for indirect injection.
+
+    Returns a block dict on first violation, or None.
+    """
+    from .guard import screen as guard_screen
+
+    for msg in (messages or []):
+        role = (msg.get("role") or "").lower()
+        if role not in ("tool", "function"):
+            continue
+        content = msg.get("content") or ""
+        if not content:
+            continue
+        v = guard_screen(content)
+        if v["blocked"]:
+            signals = list(v["signals"])
+            if f"role:{role}" not in signals:
+                signals.append(f"role:{role}")
+            return {"blocked": True, "source": f"role:{role}",
+                    "signals": signals,
+                    "reason": "indirect prompt injection detected in "
+                              f"role:{role} message"}
+    return None
 
 def check_response(policy: str, answer: str) -> dict:
     """Block answers that perform a prohibited action."""

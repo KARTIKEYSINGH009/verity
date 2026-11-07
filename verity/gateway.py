@@ -7,6 +7,7 @@ https://api.openai.com/v1. Everything else stays the same.
 import asyncio
 import hashlib
 import hmac
+import json
 import re
 import time
 from datetime import datetime, timezone
@@ -21,14 +22,15 @@ from pydantic import BaseModel, Field
 
 from . import config, mailer
 from .action_check import check_actions, unknown_language_risky
-from .cleaner import sanitize
+from .cleaner import sanitize, detect_leaked_secrets
 from .guard import screen
 from .judge import judge_faithfulness
 from .judge_authority import decision_from_flags
-from .language import detect_language
+from .language import detect_language, is_predominantly_unsupported
 from .policy import check_baseline_response as baseline_check_response
 from .policy import check_request as policy_check_request
 from .policy import check_response as policy_check_response
+from .policy import check_tool_calls, screen_tool_role_messages
 from .scoring import faithfulness_score
 from .store import (DuplicateEmail, _db_text, active_api_key, claim_auth_token,
                     create_session, create_user, delete_session,
@@ -164,7 +166,11 @@ async def _body_size_limit(request: Request, call_next):
 
 class Message(BaseModel):
     role: str
-    content: str
+    content: str | None = ""
+    # OpenAI tool-call fields (pass-through + screening)
+    tool_calls: list[dict] | None = None
+    tool_call_id: str | None = None
+    name: str | None = None
 
 
 class ChatRequest(BaseModel):
@@ -175,10 +181,15 @@ class ChatRequest(BaseModel):
     grounding_context: str = ""
     # Optional: business policy the interaction must obey (milestone 4).
     policy_context: str = ""
+    # Optional: structured tool definitions (OpenAI format, pass-through).
+    tools: list[dict] | None = None
+    tool_choice: str | dict | None = None
+    # Phase 1 (2026-11-07): deterministic state for tool_calls validation.
+    state_context: dict | None = None
 
 
 def _mock_completion(model: str, messages: list[Message]) -> dict:
-    last = messages[-1].content
+    last = messages[-1].content or ""
     text = f"[mock] echo of: {last[:120]}"
     return {
         "id": "chatcmpl-verity-mock",
@@ -984,15 +995,20 @@ async def chat_completions(req: ChatRequest, request: Request,
                                 detail={"error": "rate_limited"})
     _enforce_free_quota(authorization)
     _enforce_email_verified(authorization)
-    # Pentest F-01 (2026-10-23): a lone Unicode surrogate in chat content
-    # crashed the endpoint with a 500 — the mock answer echoes user text
-    # and Starlette's UTF-8 response encoding rejects lone surrogates.
-    # Sanitize every user-supplied text field at this boundary, before
-    # screening, policy checks, the model call, and the response, using
-    # the same helper that already protects trace logging in store.py
-    # (strips NUL, replaces lone surrogates with U+FFFD).
+
+    # Parse state_context from body or X-Verity-State header.
+    state_ctx = req.state_context
+    if state_ctx is None:
+        raw_header = request.headers.get("x-verity-state")
+        if raw_header:
+            try:
+                state_ctx = json.loads(raw_header)
+            except (json.JSONDecodeError, TypeError):
+                state_ctx = None
+
+    # Pentest F-01 (2026-10-23): sanitize every user-supplied text field.
     for m in req.messages:
-        m.content = _db_text(m.content)
+        m.content = _db_text(m.content or "") or ""
     req.model = _db_text(req.model)
     req.policy_context = _db_text(req.policy_context)
     req.grounding_context = _db_text(req.grounding_context)
@@ -1009,6 +1025,20 @@ async def chat_completions(req: ChatRequest, request: Request,
         raise HTTPException(status_code=413, detail={
             "error": "context_too_large", "field": "grounding_context",
             "limit_chars": config.MAX_GROUNDING_CHARS})
+
+    # Phase 1: Screen role:tool / role:function messages for indirect
+    # prompt injection before they reach the model.
+    raw_msgs = [m.model_dump() for m in req.messages]
+    tool_msg_block = screen_tool_role_messages(raw_msgs)
+    if tool_msg_block:
+        cid = _client_id(authorization)
+        log_trace(req.model, combined, "", 0.0, blocked=True,
+                  flags=tool_msg_block.get("signals", []), client_id=cid)
+        raise HTTPException(status_code=400, detail={
+            "error": "blocked_by_verity_guard",
+            "source": tool_msg_block.get("source"),
+            "matched_rules": tool_msg_block.get("signals", []),
+            "reason": tool_msg_block.get("reason", "")})
 
     # 1. Guard: screen EVERY message, whatever its role (audit F7).
     # Screening only user messages let an injection ride in on a system,
@@ -1086,6 +1116,22 @@ async def chat_completions(req: ChatRequest, request: Request,
                          "risky indicator; fail-closed",
                "language": lang}
         flags.append("action:unknown_language_risky")
+
+    # Phase 2.2: Fail-closed for predominantly unsupported scripts under
+    # an active policy context. Messages that are mostly in an unsupported
+    # script (Arabic, Tamil, etc.) and carry no Latin action words or other
+    # indicators are blocked when a policy_context is set, since they
+    # cannot be verified as benign by the action/guard layers.
+    if (not act["blocked"] and req.policy_context
+            and lang == "unknown"
+            and is_predominantly_unsupported(cleaned)):
+        act = {"blocked": True,
+               "actions": ["unverified_script_fail_closed"],
+               "reason": "unsupported script under active policy; "
+                         "fail-closed (unverified_script_fail_closed)",
+               "language": lang}
+        flags.append("action:unverified_script_fail_closed")
+
     if act["blocked"]:
         log_trace(req.model, combined, "", 0.0, blocked=True, flags=flags,
                   client_id=cid)
@@ -1105,6 +1151,60 @@ async def chat_completions(req: ChatRequest, request: Request,
                 "error": "blocked_by_verity_policy",
                 "action": pol["action"], "reason": pol["reason"]})
 
+    # Phase 3: Multi-turn escalation tracking. When the conversation
+    # history has multiple user messages, accumulate risk signals.
+    user_turns = [m for m in req.messages if m.role == "user"]
+    if len(user_turns) > 1:
+        # Combine signals across all user turns to catch crescendo attacks
+        multi_flags: list[str] = []
+        has_authority_claim = False
+        has_money_action = False
+        has_skip_verification = False
+        has_data_extraction = False
+        for ut in user_turns:
+            ut_screen = screen(ut.content)
+            ut_act = check_actions(ut.content)
+            for s in ut_screen["signals"]:
+                if s not in multi_flags:
+                    multi_flags.append(s)
+            for a in ut_act["actions"]:
+                if a not in multi_flags:
+                    multi_flags.append(a)
+            # Track specific threat categories across turns
+            if any(s in ("impersonation", "deva_authority")
+                   for s in ut_screen["signals"]):
+                has_authority_claim = True
+            if "money_move_new_destination" in ut_act["actions"]:
+                has_money_action = True
+            if "verification_skip" in ut_act["actions"]:
+                has_skip_verification = True
+            if "others_data_disclosure" in ut_act["actions"]:
+                has_data_extraction = True
+            if any(s in ("data_exfiltration",)
+                   for s in ut_screen["signals"]):
+                has_data_extraction = True
+        # Cross-turn combinations that indicate a crescendo attack
+        if has_authority_claim and (has_money_action or has_data_extraction):
+            if "multi_turn_escalation" not in flags:
+                flags.append("multi_turn_escalation")
+            log_trace(req.model, combined, "", 0.0, blocked=True,
+                      flags=flags, client_id=cid)
+            raise HTTPException(status_code=400, detail={
+                "error": "blocked_by_verity_guard",
+                "matched_rules": flags,
+                "reason": "multi-turn escalation detected: authority "
+                          "claim combined with sensitive action"})
+        if has_authority_claim and has_skip_verification:
+            if "multi_turn_escalation" not in flags:
+                flags.append("multi_turn_escalation")
+            log_trace(req.model, combined, "", 0.0, blocked=True,
+                      flags=flags, client_id=cid)
+            raise HTTPException(status_code=400, detail={
+                "error": "blocked_by_verity_guard",
+                "matched_rules": flags,
+                "reason": "multi-turn escalation detected: authority "
+                          "claim combined with verification skip"})
+
     # 1c. Staged judge authority (AEGIS restructure): enforce_high only,
     # reusing the shadow verdict already computed above — no new judge
     # call. Default mode is "off": with it off this step changes nothing.
@@ -1121,9 +1221,14 @@ async def chat_completions(req: ChatRequest, request: Request,
     if config.MOCK_MODE:
         result = _mock_completion(req.model, req.messages)
     else:
-        result = await _upstream_completion(
-            {"model": req.model,
-             "messages": [m.model_dump() for m in req.messages]})
+        upstream_payload = {"model": req.model,
+                            "messages": [m.model_dump(exclude_none=True)
+                                         for m in req.messages]}
+        if req.tools:
+            upstream_payload["tools"] = req.tools
+        if req.tool_choice is not None:
+            upstream_payload["tool_choice"] = req.tool_choice
+        result = await _upstream_completion(upstream_payload)
 
     # Tool-call completions carry content=None per the OpenAI spec
     # (audit #20) — coerce defensively instead of 500ing downstream.
@@ -1133,6 +1238,29 @@ async def chat_completions(req: ChatRequest, request: Request,
     answer = _db_text(_msg.get("content") or "")
     if "content" in _msg:
         _msg["content"] = answer
+
+    # Phase 1: Outbound tool_calls / function_call firewall. Intercept
+    # structured actions BEFORE returning to the client.
+    out_tool_calls = _msg.get("tool_calls") or []
+    # Legacy function_call -> normalize to tool_calls shape for checking.
+    legacy_fc = _msg.get("function_call")
+    if legacy_fc and not out_tool_calls:
+        out_tool_calls = [{"function": legacy_fc}]
+
+    if out_tool_calls:
+        tc_block = check_tool_calls(
+            out_tool_calls, req.policy_context or "", state_ctx)
+        if tc_block:
+            tcflags = list(flags) + [
+                "policy_violation",
+                f"tool:{tc_block.get('violated_tool', 'unknown')}"]
+            latency_ms = (time.perf_counter() - started) * 1000
+            log_trace(req.model, combined, answer, latency_ms,
+                      blocked=True, flags=tcflags, client_id=cid)
+            raise HTTPException(status_code=400, detail={
+                "error": "blocked_by_verity_policy",
+                "violated_tool": tc_block.get("violated_tool"),
+                "reason": tc_block.get("reason", "")})
 
     # 2b. Policy guard (response side): baseline first, always — a
     # performed bypass (verification waived, stacked discounts, refund
@@ -1161,6 +1289,19 @@ async def chat_completions(req: ChatRequest, request: Request,
                 "error": "policy_violation_in_response",
                 "action": policy_result.get("action"),
                 "reason": policy_result.get("reason", "")})
+
+    # Phase 3: Outbound secret & PII DLP scan on the model response.
+    leaked = detect_leaked_secrets(answer)
+    if leaked:
+        leak_flags = list(flags) + leaked
+        latency_ms = (time.perf_counter() - started) * 1000
+        log_trace(req.model, combined, answer, latency_ms, blocked=True,
+                  flags=leak_flags, client_id=cid)
+        raise HTTPException(status_code=400, detail={
+            "error": "blocked_by_verity_dlp",
+            "signals": leaked,
+            "reason": "outbound response contains leaked secrets or "
+                      "system prompt markers"})
 
     # 3. Score faithfulness when grounding context was supplied.
     # Milestone 2: LLM-as-judge is primary, heuristic kept as fallback/detail.

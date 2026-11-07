@@ -8,6 +8,11 @@ and Devanagari) combined with a script-independent risky indicator
 (currency, email/phone/digit-run, or a Latin action word) is blocked,
 never silently allowed. Unknown alone — a plain question in another
 script — passes with a `lang:unknown` trace flag.
+
+Phase 2 (2026-11-07): added fail-closed mode for unknown scripts when a
+policy_context or high-security mode is active. When the message is
+predominantly unsupported script AND cannot be verified as benign,
+fail-closed blocks it rather than letting it pass silently.
 """
 import re
 import unicodedata
@@ -64,3 +69,20 @@ def detect_language(text: str) -> str:
 
 def is_known(code: str) -> bool:
     return code in ("en", "hinglish", "hi-deva")
+
+
+def is_predominantly_unsupported(text: str) -> bool:
+    """True when the message text is predominantly in an unsupported script.
+
+    A message is 'predominantly unsupported' when:
+    - It has non-Latin, non-Devanagari letters (other > 0), AND
+    - Those letters make up the majority of all letter characters
+      (other > latin + deva).
+
+    This is used by the fail-closed check in the gateway to block
+    unsupported-script messages under policy contexts.
+    """
+    deva, latin, other = _counts(text)
+    if other <= 0:
+        return False
+    return other > (latin + deva)

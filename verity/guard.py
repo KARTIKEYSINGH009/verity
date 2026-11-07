@@ -42,8 +42,11 @@ RULES = {
     # marker, so the conjunction keeps them passing. No retraining.
     # EN skip markers: skip/bypass/override + check noun, "without" +
     # check noun, "do not ask me for passwords", "cannot handle OTPs".
+    # Phase 2 (2026-11-07): added blind H1 verbs: "waive", "skip every
+    # check", "bypass formalities".
     "verification_skip": (
-        r"(?:(?:skip|bypass|override).{0,50}(?:verif\w*|otp|id check|id proof|passwords?|security questions?|checks)"
+        r"(?:(?:skip|bypass|override|waive).{0,50}(?:verif\w*|otp|id check|id proof|passwords?|security questions?|checks|formalities|security check|policy)"
+        r"|skip every check"
         r"|without.{0,30}(?:verif\w*|otp|id check|id proof|passwords?|checks)"
         r"|without.{0,30}prove"
         r"|do not ask me for passwords?|do not ask for (?:verification|verif\w*|otp)"
@@ -52,7 +55,8 @@ RULES = {
         r"|cannot remember (?:any )?passwords?.{0,40}(?:let me into|give me access|just))"
         r".{0,120}(?:refund|money|cancel\w*|access|transfer|change|address|account|order|send|disclose|details|payment|delivery)"
         r"|(?:refund|money|cancel\w*|access|transfer|change|address|account|order|send|disclose|details|payment|delivery)"
-        r".{0,120}(?:(?:skip|bypass|override).{0,50}(?:verif\w*|otp|id check|id proof|passwords?|security questions?|checks)"
+        r".{0,120}(?:(?:skip|bypass|override|waive).{0,50}(?:verif\w*|otp|id check|id proof|passwords?|security questions?|checks|formalities|security check|policy)"
+        r"|skip every check"
         r"|without.{0,30}(?:verif\w*|otp|id check|id proof|passwords?|checks)"
         r"|without.{0,30}prove"
         r"|do not ask me for passwords?|do not ask for (?:verification|verif\w*|otp)"
@@ -74,11 +78,13 @@ RULES = {
         r"|bina\s+(?:verification|otp|jaanch))"
     ),
     # Devanagari skip markers: बिना (जाँच/सत्यापन/ओटीपी), जाँच किए बिना.
+    # Phase 2 (2026-11-07): added blind H1 Devanagari patterns:
+    # दस्तावेज़ (documents) + skip, वेरिफिकेशन (verification) + skip.
     "verification_skip_deva": (
-        r"(?:बिना\s+(?:किसी\s+(?:और\s+)?)?(?:जाँच|सत्यापन|ओटीपी)|जाँच\s+किए\s+बिना|बिना\s+जाँच\s+के|जाँच\s+मत\s+(?:कीजिए|करो))"
+        r"(?:बिना\s+(?:किसी\s+(?:और\s+)?)?(?:जाँच|सत्यापन|ओटीपी|दस्तावेज़|वेरिफिकेशन)|जाँच\s+किए\s+बिना|बिना\s+जाँच\s+के|जाँच\s+मत\s+(?:कीजिए|करो)|वेरिफिकेशन\s+(?:मत\s+(?:करो|कीजिए)|छोड़\s+दो|स्किप)|दस्तावेज़\s+(?:मत\s+(?:माँगो|माँगिए|माँग)|की\s+ज़रूरत\s+नहीं))"
         r".{0,120}(?:रद्द|पैसा|रिफंड|खाता|पता|ऑर्डर|भेज|बता|नंबर)"
         r"|(?:रद्द|पैसा|रिफंड|खाता|पता|ऑर्डर|भेज|बता|नंबर)"
-        r".{0,120}(?:बिना\s+(?:किसी\s+(?:और\s+)?)?(?:जाँच|सत्यापन|ओटीपी)|जाँच\s+किए\s+बिना|बिना\s+जाँच\s+के|जाँच\s+मत\s+(?:कीजिए|करो))"
+        r".{0,120}(?:बिना\s+(?:किसी\s+(?:और\s+)?)?(?:जाँच|सत्यापन|ओटीपी|दस्तावेज़|वेरिफिकेशन)|जाँच\s+किए\s+बिना|बिना\s+जाँच\s+के|जाँच\s+मत\s+(?:कीजिए|करो)|वेरिफिकेशन\s+(?:मत\s+(?:करो|कीजिए)|छोड़\s+दो|स्किप)|दस्तावेज़\s+(?:मत\s+(?:माँगो|माँगिए|माँग)|की\s+ज़रूरत\s+नहीं))"
     ),
     # Devanagari family rules (same twin logic: twins ask process questions).
     "deva_authority": r"मैं\s+(?:पुलिस|मैनेजर|बैंक)\s+से\s+बोल|मैं\s+क्षेत्रीय\s+प्रबंधक\s+बोल|मैनेजर\s+ने\s+.{0,30}(?:अनुमति|बोला|कहा)",
