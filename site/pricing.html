@@ -21,6 +21,14 @@
        it, so without this rule every section spans the full viewport with no side
        margins. Same 1180px centred width as the homepage's .wrap. */
     .container { width: min(1180px, calc(100% - 48px)); margin: 0 auto; }
+    /* Sections: the shared stylesheet gives .section no padding and no separator,
+       so the sections run together. Every section gets a divider and breathing room. */
+    .section { border-top: 1px solid var(--line); padding: 64px 0; }
+    .section-divider { border-top: 1px solid var(--line); margin: 56px 0 48px; }
+    /* Compare table: fixed layout so the three tier columns are equal and wider,
+       closer to the tier cards above; the label column stays narrow. Scrolls on mobile. */
+    .compare-matrix.compare-plans { table-layout: fixed; min-width: 720px; }
+    .compare-matrix.compare-plans th:first-child, .compare-matrix.compare-plans td:first-child { width: 220px; }
     /* Header layout: the shared stylesheet carries no .site-header rules, so this
        page defines its own top bar, mirroring the homepage's .topbar (flat, no blur). */
     .site-header { border-bottom: 1px solid var(--line); background: var(--surface); }
@@ -33,7 +41,7 @@
     .main-nav a:hover { color: var(--ink); }
     .main-nav a[aria-current="page"] { color: var(--ink); }
     .header-actions { display: flex; align-items: center; gap: 16px; }
-    .header-actions .link { color: var(--muted); font-size: .86rem; font-weight: 500; }
+    .header-actions .link { color: var(--muted); font-size: .86rem; font-weight: 500; white-space: nowrap; }
     .header-actions .link:hover { color: var(--ink); }
     .icon-link { display: inline-flex; align-items: center; color: var(--muted); }
     .icon-link:hover { color: var(--ink); }
@@ -138,8 +146,9 @@
 
         <p class="fine">One request is one inbound application request processed through Verity — not every internal model call, retry, or evaluation step. A request Verity blocks still counts, because the screening work was done.</p>
 
+        <div class="section-divider" role="separator"></div>
         <div class="section-head"><h2>Compare plans</h2></div>
-        <div class="table-scroll"><table class="compare-matrix">
+        <div class="table-scroll"><table class="compare-matrix compare-plans">
           <thead><tr><th>Feature</th><th>Free Developer</th><th>Growth</th><th>Enterprise</th></tr></thead>
           <tbody>
             <tr><td>Price</td><td>₹0</td><td>₹2,499 / month</td><td>Custom</td></tr>
