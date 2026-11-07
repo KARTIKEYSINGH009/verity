@@ -4,11 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pricing — Verity</title>
-  <meta name="description" content="Verity pricing: Free Developer ₹0 with 1,000 requests a month; Starter ₹1,499, Growth ₹2,499, Managed Pro ₹3,999; free mini-audit and assessments from ₹2,499; pilots free for the first 3 qualified customers." />
+  <meta name="description" content="Verity pricing: Free Developer ₹0 with 1,000 requests a month; Growth ₹2,499; Enterprise custom; free mini-audit and Full Assessment ₹9,999; pilots free for the first 3 qualified customers." />
   <link rel="canonical" href="https://verity-nine-flame.vercel.app/pricing" />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="Pricing — Verity" />
-  <meta property="og:description" content="Verity pricing: Free Developer ₹0 with 1,000 requests a month; Starter ₹1,499, Growth ₹2,499, Managed Pro ₹3,999; free mini-audit and assessments from ₹2,499; pilots free for the first 3 qualified customers." />
+  <meta property="og:description" content="Verity pricing: Free Developer ₹0 with 1,000 requests a month; Growth ₹2,499; Enterprise custom; free mini-audit and Full Assessment ₹9,999; pilots free for the first 3 qualified customers." />
   <meta property="og:url" content="https://verity-nine-flame.vercel.app/pricing" />
   <meta property="og:image" content="https://verity-nine-flame.vercel.app/og-image.png" />
   <meta name="twitter:card" content="summary_large_image" />
@@ -16,217 +16,204 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="stylesheet" href="/styles.css" />
   <style>
-    /* Pricing page only: five-tier grid, pilot grid, guarantee band. Flat, tokens only. */
-    .tiers { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-top: 40px; align-items: stretch; }
-    .tiers .price-card { padding: 20px; }
-    .tiers .price-card .amt { font-size: 1.28rem; }
-    .tiers .price-card ul { gap: 7px; }
-    @media (max-width: 1100px) { .tiers { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    @media (max-width: 640px) { .tiers { grid-template-columns: 1fr; } }
+    /* Pricing page only: three-tier grid, pilot grid, guarantee band. Flat, tokens only. */
+    /* Header layout: the shared stylesheet carries no .site-header rules, so this
+       page defines its own top bar, mirroring the homepage's .topbar (flat, no blur). */
+    .site-header { border-bottom: 1px solid var(--line); background: var(--surface); }
+    .header-inner { min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-name { font-weight: 700; font-size: 1.05rem; color: var(--ink); }
+    .brand-mark img { display: block; }
+    .main-nav { display: flex; align-items: center; gap: 30px; }
+    .main-nav a { color: var(--muted); font-size: .88rem; font-weight: 500; }
+    .main-nav a:hover { color: var(--ink); }
+    .main-nav a[aria-current="page"] { color: var(--ink); }
+    .header-actions { display: flex; align-items: center; gap: 16px; }
+    .header-actions .link { color: var(--muted); font-size: .86rem; font-weight: 500; }
+    .header-actions .link:hover { color: var(--ink); }
+    .icon-link { display: inline-flex; align-items: center; color: var(--muted); }
+    .icon-link:hover { color: var(--ink); }
+    @media (max-width: 860px) { .main-nav { display: none; } }
     .pilot-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 40px; align-items: stretch; }
-    .assess-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 40px; align-items: stretch; }
-    .assess-grid .price-card { padding: 20px; }
-    @media (max-width: 1100px) { .assess-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    @media (max-width: 640px) { .assess-grid { grid-template-columns: 1fr; } }
-    @media (max-width: 860px) { .pilot-grid { grid-template-columns: 1fr; } }
-    .guarantee { border: 1px solid var(--line-strong); border-radius: 12px; padding: 18px 20px; background: var(--surface); margin-top: 20px; }
-    .guarantee p { margin: 0; color: var(--muted); }
-    .guarantee p + p { margin-top: 8px; }
-    .fine { color: var(--muted); font-size: .93rem; margin-top: 18px; }
-    .fine + .fine { margin-top: 8px; }
-    .section-lede { color: var(--muted); max-width: 720px; margin: 0 0 8px; }
-    /* Badge text: white on the mint accent is too faint in dark mode. */
+    @media (max-width: 640px) { .pilot-grid { grid-template-columns: 1fr; } }
+    .plan-badge { display: inline-block; background: var(--accent); color: #fff; font-weight: 700; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 999px; padding: 3px 10px; position: absolute; top: -11px; left: 20px; }
     @media (prefers-color-scheme: dark) { .plan-badge { color: #0a0d0b; } }
+    .price-card.featured { border: 1px solid var(--accent); position: relative; }
+    .lead-in { color: var(--muted); font-size: 0.92rem; margin: 0 0 8px; }
+    .fine { color: var(--muted); font-size: 0.92rem; margin: 16px 0 0; max-width: 720px; }
+    .section-lede { color: var(--muted); font-size: 1.05rem; margin: 10px 0 0; }
+    .guarantee { margin-top: 24px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); }
+    .guarantee p { margin: 0; }
+    .price-hero { padding: 96px 0 32px; }
+    .price-hero h1 { max-width: 900px; }
+    .price-hero p { max-width: 720px; }
+    .kicker { font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <div class="wrap">
-      <a class="brand" href="/" aria-label="Verity home"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C15.5 3.8 18 5 19 5a1 1 0 0 1 1 1z"/><path d="M8 7 L12 17 L16 7"/></svg></span>Verity</a>
-      <nav aria-label="Primary">
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="/">
+        <span class="brand-mark"><img src="/favicon.svg" alt="" width="22" height="22" /></span>
+        <span class="brand-name">Verity</span>
+      </a>
+      <nav class="main-nav" aria-label="Primary">
         <a href="/product">Product</a>
         <a href="/playground">Playground</a>
         <a href="/documentation">Docs</a>
         <a href="/pricing" aria-current="page">Pricing</a>
       </nav>
-      <div class="top-actions">
-        <a class="gh-link" href="https://github.com/KARTIKEYSINGH009/verity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg><span>GitHub</span></a>
-        <a href="/login" data-auth="signin">Sign in</a>
-        <a class="button primary btn-small" href="/signup" data-auth="start">Start free</a>
-        <a class="button primary btn-small" href="/dashboard" data-auth="dash" hidden>Dashboard</a>
+      <div class="header-actions">
+        <a class="icon-link" href="https://github.com/KARTIKEYSINGH009/verity" aria-label="GitHub"><svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.03 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg></a>
+        <a class="link" href="/login">Sign in</a>
+        <a class="button primary" href="/signup">Start free</a>
       </div>
     </div>
   </header>
 
   <main>
-    <section class="block">
-      <div class="wrap">
-        <div class="page-head">
-          <p class="kicker">Pricing</p>
-          <h1>Enterprise-grade AI security. Pricing that grows with your business.</h1>
-          <p>Monthly subscriptions, billed in advance. Start free, or start a pilot — paid plans are arranged with the founder, not bought here.</p>
-        </div>
-        <div class="tiers">
+    <section class="price-hero">
+      <div class="container">
+        <p class="kicker">Pricing</p>
+        <h1>Enterprise-grade AI security. Transparent pricing. Protection that scales with your business.</h1>
+        <p class="section-lede">Monthly subscriptions, billed in advance. Start free, or start a pilot — paid plans are arranged with the founder, not bought here.</p>
+
+        <div class="price-grid">
           <div class="price-card">
             <b>Free Developer</b>
             <p class="amt"><strong>₹0</strong> <span>/ month</span></p>
-            <p>1,000 requests / month.</p>
+            <p>Free forever. For developers exploring Verity and securing side projects.</p>
             <ul>
-              <li>Basic screening</li>
+              <li>1,000 requests / month</li>
+              <li>Basic prompt-injection screening</li>
               <li>Basic trace visibility</li>
-              <li>Self-service</li>
+              <li>Self-service access</li>
+              <li>Bring your own model-provider API key</li>
             </ul>
             <div class="cta"><a class="button primary" href="/signup">Get started free</a></div>
-          </div>
-          <div class="price-card">
-            <b>Starter</b>
-            <p class="amt"><strong>₹1,499</strong> <span>/ month</span></p>
-            <p>10,000 requests / month.</p>
-            <ul>
-              <li>1 application</li>
-              <li>Prompt-injection screening</li>
-              <li>Basic business policies</li>
-              <li>Request / response traces</li>
-              <li>Basic dashboard</li>
-              <li>Standard support</li>
-            </ul>
-            <div class="cta"><a class="button secondary" href="/pilot#request">Start a pilot</a></div>
           </div>
           <div class="price-card featured">
             <span class="plan-badge">Recommended</span>
             <b>Growth</b>
             <p class="amt"><strong>₹2,499</strong> <span>/ month</span></p>
-            <p>25,000 requests / month.</p>
+            <p>For businesses securing one production application.</p>
+            <p class="lead-in">Everything in Free, plus</p>
             <ul>
+              <li>25,000 requests / month</li>
               <li>1 application</li>
-              <li>Everything in Starter</li>
-              <li>Advanced policy enforcement</li>
+              <li>Prompt-injection screening</li>
+              <li>Business-policy enforcement</li>
+              <li>Request and response traces</li>
+              <li>90-day trace retention</li>
               <li>Groundedness evaluation (automated 100-response monthly sample)</li>
-              <li>4 automated scheduled evaluations a month</li>
-              <li>90-day trace history</li>
-              <li>Detailed observability</li>
+              <li>4 automated scheduled evaluations / month</li>
+              <li>Detailed observability dashboard</li>
               <li>Standard support</li>
-            </ul>
-            <div class="cta"><a class="button secondary" href="/pilot#request">Start a pilot</a></div>
-          </div>
-          <div class="price-card">
-            <b>Managed Pro</b>
-            <p class="amt"><strong>₹3,999</strong> <span>/ month</span></p>
-            <p>50,000 requests / month.</p>
-            <ul>
-              <li>1 application</li>
-              <li>Everything in Growth</li>
-              <li>180-day trace history</li>
-              <li>Continuous gateway monitoring</li>
-              <li>1 policy review a month</li>
-              <li>One 60-minute onboarding session</li>
-              <li>Priority support — 2-business-day response</li>
-              <li>Multiple policy configurations</li>
-              <li>Advanced evaluation reporting</li>
-              <li>Founder-assisted onboarding</li>
             </ul>
             <div class="cta"><a class="button secondary" href="/pilot#request">Start a pilot</a></div>
           </div>
           <div class="price-card">
             <b>Enterprise</b>
             <p class="amt"><strong>Custom</strong></p>
-            <p>Quoted per engagement after scoping.</p>
+            <p>For larger teams, regulated workloads and businesses with custom security requirements.</p>
+            <p class="lead-in">Everything in Growth, plus</p>
             <ul>
-              <li>Custom request quota</li>
-              <li>Custom scope, quoted after scoping</li>
+              <li>Custom request quotas</li>
+              <li>Multiple policy configurations</li>
+              <li>Custom scope and integrations</li>
+              <li>180-day trace retention</li>
+              <li>Continuous automated gateway monitoring</li>
+              <li>One 60-minute onboarding session</li>
+              <li>Priority support (2-business-day response target)</li>
+              <li>Founder-assisted onboarding</li>
+              <li>Custom commercial and deployment arrangements</li>
             </ul>
             <div class="cta"><a class="button secondary" href="/pilot#request">Talk to us</a></div>
           </div>
         </div>
+
         <p class="fine">One request is one inbound application request processed through Verity — not every internal model call, retry, or evaluation step. A request Verity blocks still counts, because the screening work was done.</p>
-        <div class="compare-wrap">
-          <h2 style="font-size:1.35rem;margin:0 0 14px">Compare plans</h2>
-          <div class="table-scroll"><table class="compare-matrix">
-            <thead><tr><th>Feature</th><th>Free Developer</th><th>Starter</th><th>Growth</th><th>Managed Pro</th><th>Enterprise</th></tr></thead>
-            <tbody>
-              <tr><td>Price</td><td>₹0</td><td>₹1,499 / month</td><td>₹2,499 / month</td><td>₹3,999 / month</td><td>Custom</td></tr>
-              <tr><td>Requests / month</td><td>1,000</td><td>10,000</td><td>25,000</td><td>50,000</td><td>Custom</td></tr>
-              <tr><td>Applications</td><td>—</td><td>1</td><td>1</td><td>1</td><td>Custom</td></tr>
-              <tr><td>Trace history</td><td>—</td><td>—</td><td>90 days</td><td>180 days</td><td>Custom</td></tr>
-              <tr><td>Support</td><td>Self-service</td><td>Standard</td><td>Standard</td><td>Priority — 2-business-day response</td><td>Custom</td></tr>
-              <tr><td>Scheduled evaluations</td><td>—</td><td>—</td><td>4 a month, automated</td><td>Advanced evaluation reporting</td><td>Custom</td></tr>
-              <tr><td>Onboarding</td><td>—</td><td>—</td><td>—</td><td>One 60-minute session</td><td>Custom</td></tr>
-            </tbody>
-          </table></div>
-        </div>
+
+        <div class="section-head"><h2>Compare plans</h2></div>
+        <div class="table-scroll"><table class="compare-matrix">
+          <thead><tr><th>Feature</th><th>Free Developer</th><th>Growth</th><th>Enterprise</th></tr></thead>
+          <tbody>
+            <tr><td>Price</td><td>₹0</td><td>₹2,499 / month</td><td>Custom</td></tr>
+            <tr><td>Requests / month</td><td>1,000</td><td>25,000</td><td>Custom</td></tr>
+            <tr><td>Applications</td><td>—</td><td>1</td><td>Custom</td></tr>
+            <tr><td>Trace history</td><td>—</td><td>90 days</td><td>180 days</td></tr>
+            <tr><td>Support</td><td>Self-service</td><td>Standard</td><td>Priority — 2-business-day response</td></tr>
+            <tr><td>Scheduled evaluations</td><td>—</td><td>4 a month, automated</td><td>4 a month, automated</td></tr>
+            <tr><td>Onboarding</td><td>—</td><td>—</td><td>One 60-minute session</td></tr>
+            <tr><td>Monitoring</td><td>—</td><td>—</td><td>Continuous automated</td></tr>
+            <tr><td>Policy configurations</td><td>—</td><td>—</td><td>Multiple</td></tr>
+          </tbody>
+        </table></div>
       </div>
     </section>
 
-    <section class="block">
-      <div class="wrap">
-        <div class="section-head"><h2>Security assessments.</h2><p class="section-lede">A one-off check of your application, before you commit to a plan.</p></div>
-        <div class="assess-grid">
+    <section class="section">
+      <div class="container">
+        <div class="section-head"><h2>Security assessments.</h2><p class="section-lede">A one-off check of your application, before you commit to a plan. Separate from subscriptions — you can buy an assessment without a monthly plan.</p></div>
+        <div class="price-grid">
           <div class="price-card">
             <b>Mini-audit</b>
             <p class="amt"><strong>₹0</strong> <span>Free</span></p>
-            <p>A quick first look at your public bot.</p>
+            <p>An introductory security evaluation.</p>
             <ul>
               <li>~10 prompts on your public bot</li>
               <li>2-page report</li>
+              <li>Limited automated checks</li>
+              <li>Initial findings overview</li>
+              <li>Designed to introduce you to Verity</li>
             </ul>
             <div class="cta"><a class="button secondary" href="/pilot#request">Talk to us</a></div>
           </div>
           <div class="price-card">
-            <b>Basic Assessment</b>
-            <p class="amt"><strong>₹2,499</strong> <span>per assessment</span></p>
-            <p>Automated only — no manual red-team work.</p>
-            <ul>
-              <li>One application</li>
-              <li>Up to 25 automated security test cases</li>
-              <li>Prompt-injection and basic policy-bypass testing</li>
-              <li>Findings summary with severity and evidence (templated)</li>
-              <li>No retest</li>
-              <li>No consultation</li>
-            </ul>
-            <div class="cta"><a class="button secondary" href="/pilot#request">Talk to us</a></div>
-          </div>
-          <div class="price-card">
-            <b>Full Assessment</b>
+            <b>Full Security Assessment</b>
             <p class="amt"><strong>₹9,999</strong> <span>per assessment</span></p>
-            <p>Manual, founder-led assessment.</p>
+            <p>A full, founder-led assessment.</p>
             <ul>
-              <li>100+ attacks</li>
-              <li>Full report</li>
+              <li>100+ security attacks</li>
+              <li>Prompt-injection and policy-bypass testing</li>
+              <li>Detailed findings report</li>
+              <li>Severity classification and evidence</li>
               <li>One retest</li>
               <li>30-minute walkthrough</li>
-              <li>5 working days after access and scope confirmation</li>
+              <li>Target delivery: 5 working days after scope and access confirmation</li>
             </ul>
             <div class="cta"><a class="button secondary" href="/pilot#request">Talk to us</a></div>
           </div>
           <div class="price-card">
-            <b>Custom Assessment</b>
+            <b>Custom Security Assessment</b>
             <p class="amt"><strong>Custom</strong></p>
-            <p>Quoted per engagement after scoping.</p>
+            <p>Tailored to your application and risk.</p>
             <ul>
-              <li>Scope agreed after scoping</li>
+              <li>Tailored attack scenarios</li>
+              <li>Extended red-team testing</li>
+              <li>Multiple applications or environments</li>
+              <li>Custom reporting and engagement scope</li>
             </ul>
             <div class="cta"><a class="button secondary" href="/pilot#request">Talk to us</a></div>
           </div>
         </div>
-        <div class="guarantee">
-          <p><strong>Our guarantee:</strong> if an assessment finds nothing material, you pay nothing. If our attacks succeed, you pay the assessment fee and we recommend Verity as the fix.</p>
-        </div>
+        <div class="guarantee"><p><b>Our guarantee:</b> if an assessment finds nothing material — no successful attacks and no exploitable issue — you pay nothing. If our attacks succeed, you pay the assessment fee and we recommend Verity as the fix.</p></div>
       </div>
     </section>
 
-    <section class="block">
-      <div class="wrap">
+    <section class="section">
+      <div class="container">
         <div class="section-head"><h2>Pilots.</h2><p class="section-lede">Prove Verity on your own application before you pay for a plan.</p></div>
         <div class="pilot-grid">
           <div class="price-card">
-            <b>First 3 qualified customers</b>
+            <b>First 3 qualified pilots</b>
             <p class="amt"><strong>Free</strong></p>
             <p>2–4 weeks.</p>
             <ul>
               <li>One application</li>
               <li>Defined request allowance</li>
-              <li>Agreed evaluation scope</li>
-              <li>Feedback session</li>
+              <li>Agreed testing scope</li>
+              <li>Feedback and evaluation session</li>
               <li>Conversion discussion at the end</li>
             </ul>
             <div class="cta"><a class="button primary" href="/pilot#request">Start a pilot</a></div>
@@ -238,75 +225,112 @@
             <ul>
               <li>One application</li>
               <li>Defined request allowance</li>
-              <li>Agreed evaluation scope</li>
-              <li>Feedback session</li>
+              <li>Agreed testing scope</li>
+              <li>Feedback and evaluation session</li>
               <li>Conversion discussion at the end</li>
             </ul>
             <div class="cta"><a class="button primary" href="/pilot#request">Start a pilot</a></div>
           </div>
         </div>
-        <div class="guarantee">
-          <p><strong>Pilot credit:</strong> subscribe within 14 days of your pilot ending and the full ₹1,999 is credited against your first subscription invoice, remainder carrying forward.</p>
-        </div>
+        <div class="guarantee"><p><b>Pilot credit:</b> if you pay ₹1,999 for a pilot and subscribe within 14 days of it ending, the full ₹1,999 is credited against your first subscription invoice, and any remaining credit carries forward. The first three free pilots are not eligible, because no pilot fee was paid.</p></div>
       </div>
     </section>
 
-    <section class="block">
-      <div class="wrap">
-        <div class="section-head"><h2>Extra usage.</h2><p class="section-lede">Coming soon — usage alerts first.</p></div>
-        <p class="fine" style="margin-top:0">Extra usage will be opt-in only, with usage alerts at 80% and 100% of your quota. Nothing extra is ever charged without opting in. Until usage alerts are live in your dashboard, requests simply stop at your quota (429). The free tier has no overage: it stops at 1,000 requests.</p>
+    <section class="section">
+      <div class="container">
+        <div class="section-head"><h2>Additional usage and overages.</h2><p class="section-lede">Not available at launch.</p></div>
+        <div class="table-scroll"><table class="compare-matrix">
+          <thead><tr><th>Item</th><th>Current policy</th></tr></thead>
+          <tbody>
+            <tr><td>Included usage</td><td>Depends on subscription</td></tr>
+            <tr><td>Usage alert</td><td>Planned at 80%</td></tr>
+            <tr><td>Quota reached</td><td>Requests stop</td></tr>
+            <tr><td>API response</td><td>HTTP 429 quota_exceeded</td></tr>
+            <tr><td>Paid extra usage</td><td>Not available yet</td></tr>
+            <tr><td>Automatic extra charges</td><td>Not permitted</td></tr>
+          </tbody>
+        </table></div>
+        <p class="fine">When you reach your monthly quota, requests stop until the next billing month. Opt-in overages and usage alerts are planned for a future release.</p>
         <p class="fine">If you need headroom now, <a href="/pilot#request">talk to us</a>.</p>
       </div>
     </section>
 
-    <section class="block">
-      <div class="wrap">
-        <div class="section-head"><h2>The fine print, in plain words.</h2></div>
-        <p class="fine" style="margin-top:0">Your model bill stays yours. You pay your own model-provider bill separately — you bring your own key. Verity's price covers the security layer, policy enforcement, traces, and support, never your model spend.</p>
-        <p class="fine">Subscriptions are billed monthly, in advance.</p>
+    <section class="section">
+      <div class="container">
+        <div class="section-head"><h2>Billing and commercial terms.</h2></div>
+        <div class="table-scroll"><table class="compare-matrix">
+          <thead><tr><th>Item</th><th>Policy</th></tr></thead>
+          <tbody>
+            <tr><td>Subscription billing</td><td>Monthly, in advance</td></tr>
+            <tr><td>Annual discount</td><td>Conditional: 12 months for the price of 10</td></tr>
+            <tr><td>Annual eligibility</td><td>Only after cost and support validation</td></tr>
+            <tr><td>Annual payment</td><td>Upfront</td></tr>
+            <tr><td>Model-provider costs</td><td>Customer brings their own API key</td></tr>
+            <tr><td>Checkout</td><td>Founder-arranged initially</td></tr>
+            <tr><td>Enterprise contracts</td><td>Custom agreement</td></tr>
+            <tr><td>Dedicated deployment</td><td>Separately scoped and quoted</td></tr>
+            <tr><td>Custom development</td><td>Separately quoted</td></tr>
+          </tbody>
+        </table></div>
+        <p class="fine">Your model bill stays yours. You pay your own model-provider bill separately — you bring your own key. Verity's price covers the security layer, policy enforcement, traces, and support, never your model spend.</p>
       </div>
     </section>
 
-    <section class="block faq">
-      <div class="wrap">
+    <section class="section">
+      <div class="container">
         <div class="section-head"><h2>Frequently asked questions.</h2></div>
-        <details><summary>What happens when I hit my limit?</summary><p>Requests stop at your quota — the gateway returns a <code>429 quota_exceeded</code> response for the rest of the month. Extra usage will be opt-in only, with alerts at 80% and 100% of your quota, so nothing extra is ever charged unless you opt in — and overage pricing comes once usage alerts are live in your dashboard. The free tier has no overage and stops at 1,000 requests.</p></details>
-        <details><summary>What counts as a request?</summary><p>One inbound application request processed through Verity — not every internal model call, retry, or evaluation step. A request Verity blocks still counts, because the screening work was done.</p></details>
-        <details><summary>What if the assessment finds nothing?</summary><p>You pay nothing. If our attacks succeed, you pay the assessment fee and we recommend Verity as the fix.</p></details>
-        <details><summary>Do I pay for my model's usage too?</summary><p>No. Your model-provider bill stays yours — you bring your own key. Verity's price is for the security layer, policy enforcement, traces, and support, never your model spend.</p></details>
-        <details><summary>What happens after a pilot?</summary><p>A conversion discussion at the end of the pilot. If you subscribe within 14 days of the pilot ending, the full ₹1,999 pilot fee is credited against your first subscription invoice, remainder carrying forward.</p></details>
-        <details><summary>How does billing work?</summary><p>Monthly, billed in advance.</p></details>
+        <div class="faq-list">
+          <details><summary>What happens when I hit my limit?</summary><p>Requests stop at your quota — the gateway returns a <code>429 quota_exceeded</code> response until the next billing month. Paid extra usage is not available yet, and automatic extra charges are not permitted.</p></details>
+          <details><summary>What counts as a request?</summary><p>One request is one inbound application request processed through Verity — not every internal model call, retry, or evaluation step. A request Verity blocks still counts, because the screening work was done.</p></details>
+          <details><summary>What if the assessment finds nothing?</summary><p>You pay nothing. If an assessment finds nothing material — no successful attacks and no exploitable issue — there is no fee. If our attacks succeed, you pay the assessment fee and we recommend Verity as the fix.</p></details>
+          <details><summary>Do I pay for my model's usage too?</summary><p>No. You bring your own model-provider API key and pay your own model bill. Verity's price is for the security layer, policy enforcement, traces, and support — never for your model spend.</p></details>
+          <details><summary>What happens after a pilot?</summary><p>We sit down for a conversion discussion at the end of the pilot. If you paid ₹1,999 for the pilot and subscribe within 14 days, the full ₹1,999 is credited against your first subscription invoice, with any remainder carrying forward. The first three free pilots are not eligible, because no pilot fee was paid.</p></details>
+          <details><summary>How does billing work?</summary><p>Subscriptions are billed monthly, in advance. Paid plans are arranged with the founder — there is no checkout on this page.</p></details>
+        </div>
       </div>
     </section>
   </main>
 
   <footer class="site-footer">
-    <div class="wrap">
-      <div class="cols">
-        <div>
-          <a class="brand" href="/" aria-label="Verity home"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C15.5 3.8 18 5 19 5a1 1 0 0 1 1 1z"/><path d="M8 7 L12 17 L16 7"/></svg></span>Verity</a>
-          <p class="tagline">Your AI security layer for real-world applications.</p>
-        </div>
-        <div><h4>Product</h4><ul>
+    <div class="container cols">
+      <div>
+        <a class="brand" href="/">
+          <span class="brand-mark"><img src="/favicon.svg" alt="" width="22" height="22" /></span>
+          <span class="brand-name">Verity</span>
+        </a>
+        <p class="tagline">Your AI security layer for real-world applications.</p>
+      </div>
+      <div>
+        <h4>Product</h4>
+        <ul>
           <li><a href="/product">Architecture</a></li>
           <li><a href="/playground">Playground</a></li>
           <li><a href="/pricing">Pricing</a></li>
           <li><a href="/pilot">Pilot</a></li>
-        </ul></div>
-        <div><h4>Resources</h4><ul>
+        </ul>
+      </div>
+      <div>
+        <h4>Resources</h4>
+        <ul>
           <li><a href="/documentation">Documentation</a></li>
           <li><a href="https://github.com/KARTIKEYSINGH009/verity">GitHub</a></li>
-          <li><a href="/benchmarks.json">Benchmark data</a></li>
-        </ul></div>
-        <div><h4>Legal &amp; contact</h4><ul>
-          <li><a href="/documentation#data">Security &amp; privacy</a></li>
-          <li><a href="/pilot#request">Request a pilot</a></li>
-          <li><a href="https://www.linkedin.com/in/kartikeysingh-ks07/">LinkedIn</a></li>
-        </ul></div>
+          <li><a href="/benchmarks">Benchmark data</a></li>
+        </ul>
       </div>
-      <div class="base"><span>Built by Kartikey Singh</span><span>Current project snapshot · November 2026</span></div>
+      <div>
+        <h4>Legal &amp; contact</h4>
+        <ul>
+          <li><a href="/security">Security &amp; privacy</a></li>
+          <li><a href="/pilot">Request a pilot</a></li>
+          <li><a href="https://www.linkedin.com/in/kartikeysingh009">LinkedIn</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="container base">
+      <span>Built by Kartikey Singh</span>
+      <span>Current project snapshot · November 2026</span>
     </div>
   </footer>
-  <script src="/site.js" defer></script>
+  <script src="/site.js"></script>
 </body>
 </html>
