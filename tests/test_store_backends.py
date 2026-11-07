@@ -86,7 +86,7 @@ class _FakeConn:
 
 def _install_fake_psycopg(monkeypatch, conn):
     fake = types.ModuleType("psycopg")
-    fake.connect = lambda url, row_factory=None: conn
+    fake.connect = lambda url, row_factory=None, **kwargs: conn
     rows_mod = types.ModuleType("psycopg.rows")
     rows_mod.dict_row = object()
     fake.rows = rows_mod

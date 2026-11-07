@@ -118,7 +118,7 @@ def test_postgres_pilot_request_roundtrip(monkeypatch):
             return cur
 
     fake = types.ModuleType("psycopg")
-    fake.connect = lambda url, row_factory=None: FakeConn()
+    fake.connect = lambda url, row_factory=None, **kwargs: FakeConn()
     rows_mod = types.ModuleType("psycopg.rows")
     rows_mod.dict_row = object()
     fake.rows = rows_mod
