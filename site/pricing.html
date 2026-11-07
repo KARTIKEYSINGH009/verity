@@ -17,6 +17,10 @@
   <link rel="stylesheet" href="/styles.css" />
   <style>
     /* Pricing page only: three-tier grid, pilot grid, guarantee band. Flat, tokens only. */
+    /* .container is used only by this page and the shared stylesheet never defines
+       it, so without this rule every section spans the full viewport with no side
+       margins. Same 1180px centred width as the homepage's .wrap. */
+    .container { width: min(1180px, calc(100% - 48px)); margin: 0 auto; }
     /* Header layout: the shared stylesheet carries no .site-header rules, so this
        page defines its own top bar, mirroring the homepage's .topbar (flat, no blur). */
     .site-header { border-bottom: 1px solid var(--line); background: var(--surface); }
