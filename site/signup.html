@@ -155,11 +155,18 @@
         alertBox.classList.remove('show');
         var btn = document.getElementById('signup-btn');
         btn.disabled = true; btn.textContent = 'Creating…';
+        // Bound the wait: without a timeout a slow database leaves the
+        // button on "Creating…" forever. 30s is enough for a cold
+        // Neon wake-up once; past that, tell the user to retry.
+        var controller = new AbortController();
+        var timer = setTimeout(function () { controller.abort(); }, 30000);
         try {
           var resp = await fetch('/v1/auth/signup', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
             body: JSON.stringify({ company: form.elements.company.value, email: form.elements.email.value, password: form.elements.password.value, marketing_opt_in: document.getElementById('s-marketing').checked })
           });
+          clearTimeout(timer);
           var data = await resp.json().catch(function () { return {}; });
           if (resp.status === 201) {
             if (data.email_verified === false) {
@@ -191,7 +198,11 @@
           else alertBox.textContent = 'Signup failed just now. Please try again.';
           alertBox.classList.add('show');
         } catch (err) {
-          alertBox.textContent = 'Signup failed — the connection dropped. Please try again.';
+          if (err && err.name === 'AbortError') {
+            alertBox.textContent = 'Signup is taking too long — the database may still be waking up. Please try again.';
+          } else {
+            alertBox.textContent = 'Signup failed — the connection dropped. Please try again.';
+          }
           alertBox.classList.add('show');
         } finally {
           btn.disabled = false; btn.textContent = 'Create free account';

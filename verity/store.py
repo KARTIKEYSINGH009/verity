@@ -11,6 +11,7 @@ Two backends, chosen by configuration:
 import json
 import sqlite3
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -254,16 +255,81 @@ _PILOT_COLUMNS = ("ts, company, email, role, use_case, provider,"
                   " volume, challenges, timeline")
 
 
-def _pg_connect():
+_PG_CONNECT_TIMEOUT_S = 10
+# One cached Postgres connection per thread, and the URL the schema DDL
+# last ran against. See _pg_connect / _pg_init below.
+_PG_LOCAL = threading.local()
+_PG_INIT_LOCK = threading.Lock()
+_PG_INIT_URL: str | None = None
+
+
+def _pg_connect_new():
+    """One fresh Postgres connection. connect_timeout bounds a stalled
+    Neon wake-up instead of hanging the request indefinitely."""
     import psycopg
     from psycopg.rows import dict_row
-    return psycopg.connect(config.DATABASE_URL, row_factory=dict_row)
+    return psycopg.connect(config.DATABASE_URL, row_factory=dict_row,
+                           connect_timeout=_PG_CONNECT_TIMEOUT_S)
+
+
+def _pg_connect():
+    """One Postgres connection per thread, reused across calls.
+
+    Every store call used to open a fresh connection (and _pg_init opened
+    another one for DDL first), so a single dashboard load paid for ~12
+    sequential Neon connects and could exceed the 45s client timeout when
+    the free-tier compute was asleep — that is the Loading timeout users
+    hit in production. Reuse cuts that to one connect per warm thread.
+    A closed or dead connection is detected with a cheap probe and
+    replaced transparently. Callers keep using `with _pg_connect() as
+    conn:`; psycopg's context manager commits/rolls back on exit but
+    does not close the connection, so the cache survives it.
+    """
+    url = config.DATABASE_URL or ""
+    conn = getattr(_PG_LOCAL, "conn", None)
+    if conn is not None and getattr(_PG_LOCAL, "url", None) != url:
+        # Database changed under this thread (tests swap DATABASE_URL):
+        # drop the connection that belongs to the old database.
+        try:
+            conn.close()
+        except Exception:
+            pass
+        conn = None
+        _PG_LOCAL.conn = None
+    if conn is not None:
+        try:
+            if getattr(conn, "closed", 0):
+                raise ConnectionError("cached connection closed")
+            conn.execute("SELECT 1")
+            return conn
+        except Exception:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            _PG_LOCAL.conn = None
+    conn = _pg_connect_new()
+    _PG_LOCAL.conn = conn
+    _PG_LOCAL.url = url
+    return conn
 
 
 def _pg_init() -> None:
-    with _pg_connect() as conn:
-        conn.execute(_PG_SCHEMA)
-        conn.execute(_PG_PORTAL_SCHEMA)
+    """Create the Postgres schema once per database URL, not once per
+    query. The DDL is idempotent, so re-running after a URL change (or
+    after a failed first attempt) is safe; the flag is keyed by URL so
+    tests that swap DATABASE_URL still get their schema."""
+    global _PG_INIT_URL
+    url = config.DATABASE_URL or ""
+    if _PG_INIT_URL == url:
+        return
+    with _PG_INIT_LOCK:
+        if _PG_INIT_URL == url:
+            return
+        with _pg_connect() as conn:
+            conn.execute(_PG_SCHEMA)
+            conn.execute(_PG_PORTAL_SCHEMA)
+        _PG_INIT_URL = url
 
 
 def _pg_log(model, input_text, output_text, latency_ms, blocked,
