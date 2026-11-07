@@ -10,6 +10,7 @@ import hmac
 import json
 import re
 import time
+import uuid
 from datetime import datetime, timezone
 from urllib.parse import urlencode
 from collections import defaultdict, deque
@@ -30,6 +31,7 @@ from .language import detect_language
 from .policy import check_baseline_response as baseline_check_response
 from .policy import check_request as policy_check_request
 from .policy import check_response as policy_check_response
+from .policy import inspect_mcp_tool_arguments
 from .scoring import faithfulness_score
 from .store import (DuplicateEmail, _db_text, active_api_key, claim_auth_token,
                     create_session, create_user, delete_session,
@@ -1234,6 +1236,125 @@ async def chat_completions(req: ChatRequest, request: Request,
         result["verity"]["policy"] = {"checked": True, "result": "pass",
                                       "method": policy_result["method"]}
     return result
+
+
+# --- MCP pre/post-tool guard (piece 1 of the Universal Firewall port) ----
+# POST /v1/mcp/guard and POST /v1/tools/verify share one handler, as in
+# the zip. A client sends the tool call it is about to make (pre-tool)
+# or the call it just made plus its result (post-tool); Verity screens
+# the call's ARGUMENTS for destructive payloads (SQL destruction, shell
+# destruction, SSRF to internal targets, path traversal) and answers
+# with a decision receipt. Every decision — allow or block — is written
+# to traces, stamped with the caller's client id like chat completions.
+#
+# Auth is exactly like /v1/chat/completions: _client_authorized, 401
+# invalid_api_key BEFORE any screening, then the same IP + per-key rate
+# limits. (The zip's endpoints had no auth at all; that flaw was not
+# ported.) No upstream budget is spent here, so the free-plan quota and
+# the email-verification gate — both completions concerns — do not apply.
+#
+# Deliberately NOT in this piece: state_context / HMAC enforcement
+# (piece 4), DLP in arguments or results (piece 3), RAG screening of
+# tool results (piece 2). Those fields are accepted for request-shape
+# compatibility and ignored. A tool_result's CONTENT is not screened
+# here; post-tool, only the executed call's arguments are re-verified.
+# There is no script gate on this endpoint: benign non-Latin tool
+# arguments must pass, as they do on main.
+# ---------------------------------------------------------------------------
+
+
+class MCPGuardRequest(BaseModel):
+    tool_name: str | None = None
+    arguments: dict | str = Field(default_factory=dict)
+    tool_result: str | None = None
+    # Accepted for shape compatibility with the zip and with later
+    # pieces; NOT enforced in piece 1 (see header above).
+    agent_role: str | None = "agent"
+    state_context: dict | None = None
+    policy_context: str | None = None
+
+
+def _mcp_receipt(*, allowed: bool, deciding_layer: str, signal: str,
+                 tool_verdict: str, latency_ms: float) -> dict:
+    return {
+        "decision_id": f"vrt_{uuid.uuid4().hex[:16]}",
+        "allowed": allowed,
+        "deciding_layer": deciding_layer,
+        "signal": signal,
+        "tool_verdict": tool_verdict,
+        "judge_authority_mode": config.JUDGE_AUTHORITY_MODE,
+        "latency_ms": round(latency_ms, 2),
+        "timestamp": int(time.time()),
+    }
+
+
+def _mcp_trace_text(req: MCPGuardRequest) -> str:
+    """Compact, trace-safe summary of the guarded call: tool name plus
+    the arguments as JSON, truncated. The flags carry the verdict."""
+    try:
+        args_text = (json.dumps(req.arguments, default=str)
+                     if isinstance(req.arguments, dict)
+                     else str(req.arguments or ""))
+    except Exception:
+        args_text = ""
+    summary = (req.tool_name or "unknown_tool") + " " + args_text
+    return _db_text(summary)[:500]
+
+
+@app.post("/v1/mcp/guard")
+@app.post("/v1/tools/verify")
+async def mcp_tool_guard(req: MCPGuardRequest, request: Request,
+                         authorization: str | None = Header(default=None)):
+    started = time.perf_counter()
+    if not _client_authorized(authorization):
+        raise HTTPException(status_code=401, detail={
+            "error": "invalid_api_key",
+            "reason": "present your Verity client key as "
+                      "'Authorization: Bearer <key>'"})
+    client = _client_key(request)
+    if _rate_limited(client):
+        raise HTTPException(status_code=429, detail={"error": "rate_limited"})
+    if authorization and authorization.startswith("Bearer "):
+        _tok = authorization.removeprefix("Bearer ").strip()
+        if _tok and _rate_limited(
+                "key:" + hashlib.sha256(_tok.encode()).hexdigest()[:16]):
+            raise HTTPException(status_code=429,
+                                detail={"error": "rate_limited"})
+    cid = _client_id(authorization)
+    post_tool = req.tool_result is not None
+    phase = "post" if post_tool else "pre"
+    layer = f"mcp_{phase}_tool_arguments"
+    trace_input = _mcp_trace_text(req)
+
+    args = req.arguments if req.arguments not in (None, {}, "") else {}
+    if args:
+        res = inspect_mcp_tool_arguments(args)
+        if res["blocked"]:
+            latency_ms = (time.perf_counter() - started) * 1000
+            flags = [f"mcp:{res['reason']}", f"mcp:{phase}"]
+            log_trace("mcp-guard", trace_input, "", latency_ms,
+                      blocked=True, flags=flags, client_id=cid)
+            receipt = _mcp_receipt(
+                allowed=False, deciding_layer=layer,
+                signal=res["reason"], tool_verdict="blocked",
+                latency_ms=latency_ms)
+            raise HTTPException(status_code=403, detail={
+                "error": "blocked_by_verity_mcp_guard",
+                "signal": res["reason"],
+                "deciding_layer": layer,
+                "reason": res["detail"],
+                "verity_receipt": receipt})
+
+    latency_ms = (time.perf_counter() - started) * 1000
+    log_trace("mcp-guard", trace_input, "", latency_ms,
+              blocked=False, flags=["mcp:verified_safe", f"mcp:{phase}"],
+              client_id=cid)
+    receipt = _mcp_receipt(
+        allowed=True, deciding_layer="mcp_guard",
+        signal="verified_safe", tool_verdict="verified_safe",
+        latency_ms=latency_ms)
+    return {"allowed": True, "tool_verdict": "verified_safe",
+            "verity_receipt": receipt}
 
 
 # Serve the landing page (site/) at the root URL when deployed (e.g. Vercel),

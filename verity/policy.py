@@ -322,6 +322,7 @@ def check_baseline_response(answer: str) -> dict:
     return {"violates": False, "action": None, "method": "policy_rule",
             "reason": ""}
 
+
 def check_response(policy: str, answer: str) -> dict:
     """Block answers that perform a prohibited action."""
     for action in _prohibited_actions(policy):
@@ -347,3 +348,115 @@ def check_response(policy: str, answer: str) -> dict:
         return judged
     return {"violates": False, "action": None, "method": "policy_rule",
             "reason": ""}
+
+
+# ---------------------------------------------------------------------------
+# MCP pre/post-tool guard (piece 1 of the Universal Firewall port,
+# 2026-11-07). Deterministic destructive-argument scanning for tool
+# calls, ported from the zip's /v1/mcp/guard behaviour onto main's
+# architecture — its divergent APIs (evaluate_action, PolicyEngine, ...)
+# were NOT imported.
+#
+# Scope, deliberately narrow (founder order: one piece at a time):
+# - SQL destruction, shell destruction, SSRF to internal targets, and
+#   path traversal inside tool ARGUMENTS, checked pre-tool (before the
+#   tool runs) and post-tool (verifying the executed call, when a
+#   tool_result is present).
+# - NOT in this piece: state/HMAC enforcement (piece 4), DLP in
+#   arguments or tool results (piece 3), RAG/ingest screening of tool
+#   results (piece 2). A tool_result's CONTENT is therefore not screened
+#   here — only the executed call's arguments are re-verified.
+# - NO script gate here at all: the zip's unconditional gate
+#   false-alarms benign non-Latin messages, and main's script handling
+#   is unchanged by this piece (H2 twins must stay 20/20).
+# ---------------------------------------------------------------------------
+_MCP_SQL_RX = re.compile(
+    r"(?:\bDROP\s+(?:TABLE|DATABASE|SCHEMA)\b|"
+    r"\bUNION\s+(?:ALL\s+)?SELECT\b|;\s*--|"
+    r"\bOR\s+['\"]?1['\"]?\s*=\s*['\"]?1\b|"
+    r"\bDELETE\s+FROM\s+\w+\s*(?:;|$)|"
+    r"\bEXEC(?:UTE)?\s*\()",
+    re.IGNORECASE,
+)
+_MCP_CMD_RX = re.compile(
+    r"(?:\brm\s+-[rRfF]+|"
+    r"&&\s*(?:rm|curl|wget|bash|sh|nc|python|perl|cat|chmod|chown)\b|"
+    r";\s*(?:rm|curl|wget|bash|sh|nc|cat)\b|"
+    r"\$\([^\)]+\)|`[^`]+`|"
+    r"\|\s*(?:bash|sh|zsh)\b|/bin/(?:sh|bash))",
+    re.IGNORECASE,
+)
+_MCP_SSRF_RX = re.compile(
+    r"(?:169\.254\.169\.254|metadata\.google\.internal|"
+    r"100\.100\.100\.200|"
+    r"(?:https?|file|gopher|dict|ftp)://(?:localhost|127\.0\.0\.\d+|"
+    r"0\.0\.0\.0|\[::1\])(?::\d+|/|$)|"
+    r"\b(?:localhost|127\.0\.0\.1)\b)",
+    re.IGNORECASE,
+)
+_MCP_TRAVERSAL_RX = re.compile(
+    r"(?:\.\./|\.\.\\|/etc/(?:passwd|shadow|hosts)|"
+    r"c:\\windows\\system32)",
+    re.IGNORECASE,
+)
+
+
+def _mcp_flatten_arguments(arguments) -> tuple[dict, str]:
+    """Parse tool arguments (dict, or a JSON string) and flatten every
+    key and value — nested dicts and lists included — into one
+    searchable string. Keys are included: a destructive payload can
+    ride in a key name as well as a value."""
+    if isinstance(arguments, str):
+        try:
+            parsed = json.loads(arguments)
+        except ValueError:
+            parsed = {"_raw": arguments}
+    elif isinstance(arguments, dict):
+        parsed = arguments
+    else:
+        parsed = {"_raw": str(arguments)}
+    flat: list[str] = []
+
+    def _collect(val) -> None:
+        if isinstance(val, dict):
+            for k, v in val.items():
+                flat.append(str(k))
+                _collect(v)
+        elif isinstance(val, list):
+            for item in val:
+                _collect(item)
+        elif val is not None:
+            flat.append(str(val))
+
+    _collect(parsed)
+    return parsed, " | ".join(flat)
+
+
+def inspect_mcp_tool_arguments(arguments) -> dict:
+    """Scan tool arguments for destructive payloads. Returns a dict
+    with blocked / reason / detail / parsed_args. Check order is
+    fixed (SQL, then shell, then SSRF, then traversal) so a payload
+    matching several rules always reports the same reason."""
+    parsed, joined = _mcp_flatten_arguments(arguments)
+    if _MCP_SQL_RX.search(joined):
+        return {"blocked": True, "reason": "tool_arg_sql_injection",
+                "detail": "SQL injection payload detected in tool "
+                          "arguments",
+                "parsed_args": parsed}
+    if _MCP_CMD_RX.search(joined):
+        return {"blocked": True, "reason": "tool_arg_command_injection",
+                "detail": "Command injection payload detected in tool "
+                          "arguments",
+                "parsed_args": parsed}
+    if _MCP_SSRF_RX.search(joined):
+        return {"blocked": True, "reason": "tool_arg_ssrf",
+                "detail": "SSRF internal target detected in tool "
+                          "arguments",
+                "parsed_args": parsed}
+    if _MCP_TRAVERSAL_RX.search(joined):
+        return {"blocked": True, "reason": "tool_arg_path_traversal",
+                "detail": "Path traversal sequence detected in tool "
+                          "arguments",
+                "parsed_args": parsed}
+    return {"blocked": False, "reason": None, "detail": None,
+            "parsed_args": parsed}
