@@ -17,7 +17,7 @@ from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -43,7 +43,7 @@ from .store import (DuplicateEmail, _db_text, active_api_key, claim_auth_token,
                     log_pilot_request, log_trace, recent_pilot_requests,
                     recent_traces, revoke_api_keys, set_email_verified,
                     set_marketing_opt_in, update_user_password,
-                    usage_for_client)
+                    usage_for_client, usage_series)
 
 
 @asynccontextmanager
@@ -681,12 +681,59 @@ def me(request: Request):
         payload["usage"] = usage_for_client(
             client_id, since_ts=_month_start_ts())
         payload["traces"] = [
-            {"ts": t["ts"], "model": t["model"],
+            {"id": t["id"], "ts": t["ts"], "model": t["model"],
              "input_text": t["input_text"][:160],
              "blocked": t["blocked"],
+             "latency_ms": t["latency_ms"],
+             "flags": _parse_flags(t.get("flags_json")),
              "faithfulness": t["faithfulness"]}
             for t in recent_traces(limit=10, client_id=client_id)]
     return payload
+
+
+def _parse_flags(flags_json) -> list:
+    """Matched-rule flags stored with a trace; [] when absent or bad."""
+    try:
+        flags = json.loads(flags_json or "[]")
+    except (ValueError, TypeError):
+        return []
+    return [f for f in flags if isinstance(f, str)]
+
+
+_SERIES_RANGES = {"24H": (24 * 3600, 12), "7D": (7 * 86400, 7),
+                  "30D": (30 * 86400, 10)}
+
+
+@app.get("/v1/me/usage/series")
+def me_usage_series(request: Request,
+                    range_: str = Query("7D", alias="range")):
+    """Allowed/blocked buckets for the dashboard request-activity chart.
+    Buckets carry a start timestamp; the dashboard formats labels in the
+    viewer's local time. Session auth, tenant-scoped to the caller's key."""
+    user = _session_user(request)
+    if not user:
+        raise HTTPException(status_code=401,
+                            detail={"error": "not_signed_in"})
+    if range_ not in _SERIES_RANGES:
+        raise HTTPException(status_code=400, detail={
+            "error": "validation_failed", "fields": ["range"]})
+    window_s, bucket_count = _SERIES_RANGES[range_]
+    now = time.time()
+    start = now - window_s
+    width = window_s / bucket_count
+    buckets = [{"start_ts": start + i * width, "allowed": 0, "blocked": 0}
+               for i in range(bucket_count)]
+    key = active_api_key(user["id"])
+    if key:
+        for point in usage_series(f"user:{user['id']}", start):
+            idx = min(int((point["ts"] - start) / width), bucket_count - 1)
+            if idx < 0:
+                continue
+            if point["blocked"]:
+                buckets[idx]["blocked"] += 1
+            else:
+                buckets[idx]["allowed"] += 1
+    return {"range": range_, "buckets": buckets}
 
 
 @app.post("/v1/me/preferences")
@@ -1327,9 +1374,15 @@ def pilot_page():
 
 
 @app.get("/app", include_in_schema=False)
-@app.get("/dashboard", include_in_schema=False)
 def dashboard_page():
+    # Old static dashboard; kept as a fallback until the founder retires
+    # it. The new React dashboard lives at /dashboard.
     return FileResponse(_site_dir / "app.html")
+
+
+@app.get("/dashboard", include_in_schema=False)
+def dashboard_react_page():
+    return FileResponse(_site_dir / "dashboard" / "index.html")
 
 
 @app.get("/product", include_in_schema=False)
