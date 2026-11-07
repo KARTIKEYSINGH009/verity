@@ -29,11 +29,10 @@
        closer to the tier cards above; the label column stays narrow. Scrolls on mobile. */
     .compare-matrix.compare-plans { table-layout: fixed; min-width: 720px; }
     .compare-matrix.compare-plans th:first-child, .compare-matrix.compare-plans td:first-child { width: 220px; }
-    /* Compare table polish: feature names in ink, and the Growth (Recommended)
-       column tinted so it reads as the recommended one, like the featured card. */
+    /* Compare table polish: feature names in ink, and a vertical line between
+       each column so the tiers read as separate columns. */
     .compare-matrix.compare-plans td:first-child { color: var(--ink); font-weight: 600; }
-    .compare-matrix.compare-plans th:nth-child(3), .compare-matrix.compare-plans td:nth-child(3) { background: var(--accent-soft); }
-    .compare-matrix.compare-plans th:nth-child(3) { color: var(--accent-strong); }
+    .compare-matrix.compare-plans th:not(:first-child), .compare-matrix.compare-plans td:not(:first-child) { border-left: 1px solid var(--line); }
     /* Key-value terms: a bordered card of label/value rows, not a raw table. */
     .terms { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden; }
     .terms .term { display: grid; grid-template-columns: 240px 1fr; gap: 16px; padding: 14px 20px; }
