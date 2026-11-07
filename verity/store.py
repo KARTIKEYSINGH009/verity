@@ -832,6 +832,21 @@ def revoke_api_keys(user_id) -> None:
           (user_id,), fetch="none")
 
 
+def usage_series(client_id, since_ts) -> list:
+    """Raw (ts, blocked) points for one client's traces at/after
+    `since_ts`, oldest first. The gateway buckets them for the
+    dashboard chart — bucketing in Python keeps one query working
+    on both sqlite and Postgres."""
+    rows = _rows(
+        "SELECT ts, blocked FROM traces"
+        " WHERE client_id = ? AND ts >= ? ORDER BY ts",
+        "SELECT ts, blocked FROM traces"
+        " WHERE client_id = %s AND ts >= %s ORDER BY ts",
+        (client_id, since_ts))
+    return [{"ts": float(r["ts"]), "blocked": int(r["blocked"])}
+            for r in rows]
+
+
 def usage_for_client(client_id, since_ts=None) -> dict:
     """Usage aggregates for one client identity. `month_total` counts
     traces at or after `since_ts` (the free-quota window); avg latency
