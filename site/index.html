@@ -17,9 +17,9 @@
 <meta name="twitter:title" content="Verity — AI firewall for LLM apps" />
 <meta name="twitter:description" content="Verity — an AI firewall for LLM apps. Screens prompts for injection attacks, enforces business policy, grades answers for faithfulness, logs every request." />
 <meta name="twitter:image" content="https://verity-nine-flame.vercel.app/og-image.png" />
+<link rel="stylesheet" href="/fonts-inter.css" />
+<link rel="stylesheet" href="/fonts-playfair.css" />
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
   :root{
     --bg:#0a0d0b;
     --bg-soft:#111511;
@@ -70,9 +70,7 @@
   /* ---------- Topbar ---------- */
   .topbar{
     position:sticky; top:0; z-index:30;
-    background:rgba(8,8,12,0.72);
-    backdrop-filter:blur(14px) saturate(140%);
-    -webkit-backdrop-filter:blur(14px) saturate(140%);
+    background:var(--bg);
     border-bottom:1px solid var(--border);
   }
   .topbar .wrap{min-height:72px; display:flex; align-items:center; justify-content:space-between; gap:24px}
@@ -107,7 +105,7 @@
   }
   .button.primary{
     background:var(--accent);
-    color:#0a0d0b; border-color:transparent; box-shadow:0 10px 24px -10px rgba(79,191,138,0.35);
+    color:#0a0d0b; border-color:transparent;
   }
   .button.primary:hover{filter:brightness(1.06); transform:translateY(-1px)}
   .button.secondary{background:transparent; border:1px solid var(--border-strong); color:var(--ink)}
@@ -117,7 +115,7 @@
   .button.ghost-dark{background:transparent; border:1px solid rgba(242,238,228,0.35); color:var(--ink)}
 
   /* ---------- Hero ---------- */
-  .hero{padding:96px 0 72px; display:grid; grid-template-columns:minmax(0,1.05fr) minmax(400px,.95fr); gap:68px; align-items:center}
+  .hero{padding:88px 0 64px; display:grid; grid-template-columns:minmax(0,1.05fr) minmax(400px,.95fr); gap:68px; align-items:center}
   .kicker{
     margin:0 0 22px; color:var(--gold-strong); font-family:var(--mono); font-size:.76rem;
     font-weight:600; letter-spacing:.18em; text-transform:uppercase; display:flex; align-items:center; gap:10px;
@@ -136,7 +134,6 @@
   .gateway-panel{
     background:var(--surface);
     border:1px solid var(--border-strong); border-radius:var(--r-lg);
-    box-shadow:0 30px 60px -30px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.03);
     overflow:hidden;
   }
   .panel-bar{display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:1px solid var(--border); font-size:.78rem; color:var(--muted-2); letter-spacing:.04em; text-transform:uppercase}
@@ -166,9 +163,11 @@
   .stat span.label{display:block; font-size:.82rem; color:var(--muted-2); margin-top:4px; line-height:1.4}
 
   /* ---------- Sections ---------- */
-  .block{padding:104px 0}
+  .block{padding:88px 0}
   .block.tight{padding-top:0}
-  .section-head{max-width:680px; margin-bottom:52px}
+  .section-head{max-width:680px; margin-bottom:48px}
+  .section-kicker{margin:0 0 12px; color:var(--gold-strong); font-family:var(--mono); font-size:.76rem; font-weight:600; letter-spacing:.18em; text-transform:uppercase; display:flex; align-items:center; gap:10px}
+  .section-kicker::before{content:""; width:28px; height:1px; background:var(--gold-strong); display:inline-block}
   .section-head h2{font-family:var(--serif); font-weight:600; font-size:2.3rem; margin:0 0 14px; letter-spacing:-.01em}
   .section-head p{color:var(--muted); font-size:1.02rem; line-height:1.75; margin:0}
   .section-head p a, .block p a, .bench-note p a{color:var(--gold-strong); border-bottom:1px solid rgba(79,191,138,0.35)}
@@ -339,6 +338,47 @@
     .gh-link{display:none}
     .ghost-link{white-space:nowrap}
   }
+
+  /* ---------- Light theme (follows the system setting, like the rest of the site) ----------
+     The homepage used to be dark-only; a light-mode visitor got a dark homepage and a
+     light pricing page. Tokens mirror the site stylesheet; code windows stay dark in
+     both themes, and the CTA band stays dark, so its text needs explicit light overrides. */
+  @media (prefers-color-scheme: light) {
+    :root{
+      --bg:#ffffff;
+      --bg-soft:#f5f6f5;
+      --surface:#ffffff;
+      --surface-2:#f5f6f5;
+      --border:#dfe4df;
+      --border-strong:#8a948c;
+      --ink:#0d130f;
+      --muted:#55615a;
+      --muted-2:#55615a;
+      --accent:#0a6b4e;
+      --accent-strong:#085c42;
+      --accent-soft:#e4f0e9;
+      --gold:#0a6b4e;
+      --gold-strong:#085c42;
+      --gold-soft:#e4f0e9;
+      --danger:#b3261e;
+      --danger-soft:#f9eae8;
+      --code-bg:#0c100d;
+      --code-line:#263129;
+    }
+    .button.primary, .button.on-dark{color:#fff}
+    .stats{background:var(--surface-2)}
+    code{background:rgba(13,19,15,.06)}
+    .d-step{background:rgba(13,19,15,.03)}
+    .bar{background:rgba(13,19,15,.08)}
+    .t-tag.dim{background:rgba(13,19,15,.06)}
+    .code-window .cmt, .json-card .cmt, .demo-curl .cmt, .copy-row{color:#7d8a7e}
+    .section-head p a, .block p a, .bench-note p a{border-bottom-color:rgba(10,107,78,.35)}
+    .d-gw{border-color:var(--border-strong)}
+    .cta-band h2{color:#ecf1ec}
+    .cta-band p{color:#a4b0a5}
+    .cta-band .kicker{color:#6bd3a1}
+    .cta-band .button.ghost-dark{color:#ecf1ec}
+  }
 </style>
 </head>
 <body>
@@ -409,6 +449,7 @@
   <section class="block" id="preview">
     <div class="wrap">
       <div class="section-head">
+        <p class="section-kicker">Live preview</p>
         <h2>Try the guard right now.</h2>
         <p>A live preview against the real gateway on this site. The full playground — grounding checks, example scenarios, trace detail — lives on its own page.</p>
       </div>
@@ -427,6 +468,7 @@
   <section class="block" id="measured" style="padding-top:0">
     <div class="wrap">
       <div class="section-head">
+        <p class="section-kicker">Benchmarks</p>
         <h2>Measured, not promised.</h2>
         <p>Held-out benchmark: 45 prompts the model never trained on — 25 fresh attacks in new phrasings (including multilingual and spacing-obfuscated), 20 deliberately hard benign near-misses. Threshold checked on a separate 16-prompt validation set. Reproduce it from the repository with <code>python scripts/run_benchmarks.py</code>; full data in benchmarks.json. These are internal measurements on a small set — a signal, not an independent security certification. <span id="bench-date">Last measured 2026-10-27.</span></p>
       </div>
@@ -466,6 +508,7 @@
   <section class="block" id="architecture">
     <div class="wrap">
       <div class="section-head">
+        <p class="section-kicker">Architecture</p>
         <h2>A security layer between your app and any model.</h2>
         <p>Verity inspects every request and response, applies security and business logic, evaluates groundedness, and logs structured traces for complete visibility.</p>
       </div>
@@ -506,6 +549,7 @@
   <section class="block trace-band" id="traces">
     <div class="wrap">
       <div class="section-head">
+        <p class="section-kicker">Traces</p>
         <h2>See what happened, and why.</h2>
         <p>Every request produces a structured trace with matched signals, policy decisions, and evaluation scores. This one is real: the live gateway's response to an attack on 21 October 2026, after an independent red-team model generated it.</p>
       </div>
@@ -543,6 +587,7 @@
   <section class="block" id="integrate">
     <div class="wrap integration-grid">
       <div class="integration-copy">
+        <p class="section-kicker">Integration</p>
         <h2>Keep your client. Change the route.</h2>
         <p>Verity exposes an OpenAI-compatible chat completions endpoint, so the integration is a base-URL swap — not an application rewrite.</p>
         <ul class="plain-list">
@@ -587,6 +632,7 @@ curl -X POST https://verity-nine-flame.vercel.app/v1/chat/completions \
   <section class="block" style="padding-top:0">
     <div class="wrap">
       <div class="section-head">
+        <p class="section-kicker">Roadmap</p>
         <h2>What has shipped.</h2>
         <p>The current repository is working software, not a concept page. These are the implemented milestones and the next engineering targets.</p>
       </div>
@@ -605,6 +651,7 @@ curl -X POST https://verity-nine-flame.vercel.app/v1/chat/completions \
   <section class="block" id="trust" style="padding-top:0">
     <div class="wrap">
       <div class="section-head">
+        <p class="section-kicker">Trust</p>
         <h2>Trust, stated plainly.</h2>
         <p>Verity inspects AI traffic, so its own behavior has to be inspectable too.</p>
       </div>
@@ -627,6 +674,7 @@ curl -X POST https://verity-nine-flame.vercel.app/v1/chat/completions \
   <section class="block" id="offers" style="padding-top:0">
     <div class="wrap">
       <div class="section-head">
+        <p class="section-kicker">Services</p>
         <h2>Work with Verity.</h2>
         <p>The public demo is free and stays free — it is how developers evaluate the guard. Commercial work is scoped, founder-led, and provisioned manually: you work with the person who built it.</p>
       </div>
@@ -641,6 +689,7 @@ curl -X POST https://verity-nine-flame.vercel.app/v1/chat/completions \
   <section class="block" style="padding-top:0">
     <div class="wrap">
       <div class="section-head">
+        <p class="section-kicker">Use cases</p>
         <h2>Where Verity fits.</h2>
       </div>
       <div class="fit-grid">
