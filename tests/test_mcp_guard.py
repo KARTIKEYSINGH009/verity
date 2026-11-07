@@ -10,6 +10,7 @@ the SHAPES of the blind H3 MCP rows (tool + arguments + optional result)
 without copying any H3 row.
 """
 import hashlib
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -336,3 +337,65 @@ def test_allowed_decision_traced(monkeypatch):
     assert rows, "no trace row for the allowed MCP call"
     assert rows[0]["blocked"] == 0
     assert "mcp:verified_safe" in rows[0]["flags_json"]
+
+
+# --- Free-plan quota is enforced on the MCP endpoints ------------------------
+# (founder order 2026-11-07: the 1,000/month limit applies to MCP too.
+# MCP calls are logged under the caller's client id, so they count toward
+# the same monthly total chat checks — and are now capped the same way.)
+
+_BENIGN = {"tool_name": "run_query",
+           "arguments": {"sql": "SELECT id FROM users LIMIT 1"}}
+
+
+def _portal_key(c):
+    # Fresh user every call: the suite shares one sqlite DB, so a fixed
+    # email would 409 on a second run.
+    email = f"mcp-quota-{uuid.uuid4().hex[:8]}@example.com"
+    r = c.post("/v1/auth/signup", json={
+        "email": email, "password": "correct horse 9",
+        "company": "Quota Co"})
+    assert r.status_code == 201, r.text
+    return r.json()["api_key"]
+
+
+def test_free_quota_enforced_on_mcp_guard(monkeypatch):
+    monkeypatch.setattr(config, "CLIENT_KEYS", [])
+    monkeypatch.setattr(config, "FREE_MONTHLY_QUOTA", 2)
+    with TestClient(app) as c:
+        key = _portal_key(c)
+        assert _post(c, _BENIGN, key=key).status_code == 200
+        assert _post(c, _BENIGN, key=key).status_code == 200
+        third = _post(c, _BENIGN, key=key)
+    assert third.status_code == 429
+    assert third.json()["detail"]["error"] == "quota_exceeded"
+
+
+def test_free_quota_enforced_on_tools_verify(monkeypatch):
+    monkeypatch.setattr(config, "CLIENT_KEYS", [])
+    monkeypatch.setattr(config, "FREE_MONTHLY_QUOTA", 2)
+    with TestClient(app) as c:
+        key = _portal_key(c)
+        assert _post(c, _BENIGN, key=key, route=VERIFY).status_code == 200
+        assert _post(c, _BENIGN, key=key, route=VERIFY).status_code == 200
+        third = _post(c, _BENIGN, key=key, route=VERIFY)
+    assert third.status_code == 429
+    assert third.json()["detail"]["error"] == "quota_exceeded"
+
+
+def test_anonymous_mcp_call_not_quota_limited(monkeypatch):
+    monkeypatch.setattr(config, "CLIENT_KEYS", [])
+    monkeypatch.setattr(config, "FREE_MONTHLY_QUOTA", 1)
+    with TestClient(app) as c:
+        r = _post(c, _BENIGN)
+    assert r.status_code == 200
+    assert r.json()["allowed"] is True
+
+
+def test_env_key_mcp_call_not_quota_limited(monkeypatch):
+    monkeypatch.setattr(config, "CLIENT_KEYS", ["vk-env"])
+    monkeypatch.setattr(config, "FREE_MONTHLY_QUOTA", 1)
+    with TestClient(app) as c:
+        r = _post(c, _BENIGN, key="vk-env")
+    assert r.status_code == 200
+    assert r.json()["allowed"] is True

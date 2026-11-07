@@ -1249,9 +1249,11 @@ async def chat_completions(req: ChatRequest, request: Request,
 #
 # Auth is exactly like /v1/chat/completions: _client_authorized, 401
 # invalid_api_key BEFORE any screening, then the same IP + per-key rate
-# limits. (The zip's endpoints had no auth at all; that flaw was not
-# ported.) No upstream budget is spent here, so the free-plan quota and
-# the email-verification gate — both completions concerns — do not apply.
+# limits, then the same free-plan quota (_enforce_free_quota, 429
+# quota_exceeded at 1,000/month for portal keys — MCP calls are logged
+# to traces under the caller's client id, so they count toward the same
+# monthly total chat checks). The email-verification gate is a
+# completions concern and does NOT apply here (separate founder pick).
 #
 # Deliberately NOT in this piece: state_context / HMAC enforcement
 # (piece 4), DLP in arguments or results (piece 3), RAG screening of
@@ -1320,6 +1322,7 @@ async def mcp_tool_guard(req: MCPGuardRequest, request: Request,
                 "key:" + hashlib.sha256(_tok.encode()).hexdigest()[:16]):
             raise HTTPException(status_code=429,
                                 detail={"error": "rate_limited"})
+    _enforce_free_quota(authorization)
     cid = _client_id(authorization)
     post_tool = req.tool_result is not None
     phase = "post" if post_tool else "pre"
