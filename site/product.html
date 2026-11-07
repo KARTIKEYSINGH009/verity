@@ -15,6 +15,8 @@
   <meta name="twitter:image" content="https://verity-nine-flame.vercel.app/og-image.png" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/fonts-inter.css" />
+  <link rel="stylesheet" href="/fonts-playfair.css" />
 </head>
 <body>
   <header class="topbar">
@@ -61,9 +63,9 @@
 
     <section class="block">
       <div class="wrap">
-        <div class="section-head"><h2>Each layer in detail.</h2></div>
+        <div class="section-head"><p class="section-kicker">Layers</p><h2>Each layer in detail.</h2></div>
         <div class="layers layers-4">
-          <div class="layer"><b>Input Guard</b><p>Detects prompt injection, jailbreak attempts and other malicious inputs. Two systems vote: deterministic rules for known attack shapes, and a Naive Bayes classifier (200 training examples, word + character n-grams) for paraphrases and obfuscation — leetspeak, homoglyphs, spacing tricks and base64 are normalized before screening. Held-out recall 88%, precision 91.7%.</p></div>
+          <div class="layer"><b>Input Guard</b><p>Detects prompt injection, jailbreak attempts and other malicious inputs. Two systems vote: deterministic rules for known attack shapes, and a Naive Bayes classifier (568 training examples, word + character n-grams) for paraphrases and obfuscation — leetspeak, homoglyphs, spacing tricks and base64 are normalized before screening. Held-out recall 88%, precision 91.7%.</p></div>
           <div class="layer"><b>Policy Guard</b><p>Enforces your custom business rules and content restrictions, declared per request as a <code>policy_context</code>. Checked before the model (a prohibited ask never gets answered) and after it (a non-compliant answer never reaches the user). In live mode the policy judge fails closed.</p></div>
           <div class="layer"><b>Faithfulness Judge</b><p>Checks whether answers are grounded in your context or provided documents. Live mode uses an LLM judge; a content-word heuristic is the disclosed offline fallback. Unsupported claims are flagged in the trace, and policy-violating answers are blocked outright.</p></div>
           <div class="layer"><b>Traces</b><p>Logs every request, verdict and escalation for debugging and audit — stamped with a per-client identity derived from the calling key (the key itself is never stored). Retained 30 days, pruned on an ongoing basis.</p></div>
@@ -73,7 +75,7 @@
 
     <section class="block">
       <div class="wrap">
-        <div class="section-head"><h2>Deployment options.</h2></div>
+        <div class="section-head"><p class="section-kicker">Deployment</p><h2>Deployment options.</h2></div>
         <div class="layers">
           <div class="layer"><b>Hosted — this site (free tier)</b><p>Create an account and call this site's gateway with your own key. Screening is production code; the model is a mock, for evaluation and integration testing. <a href="/signup">Start free</a></p></div>
           <div class="layer"><b>Pilot — dedicated deployment</b><p>A founder-led deployment on your traffic: your provider and key, your policies, weekly reports, success criteria in writing. <a href="/pilot">How pilots work</a></p></div>
@@ -85,6 +87,7 @@
     <section class="block">
       <div class="wrap">
         <div class="section-head">
+          <p class="section-kicker">Status</p>
           <h2>Implemented vs planned, honestly.</h2>
           <p>Nothing on this page is vaporware-labeled as shipped. The current state:</p>
         </div>
@@ -135,7 +138,7 @@
           <li><a href="https://www.linkedin.com/in/kartikeysingh-ks07/">LinkedIn</a></li>
         </ul></div>
       </div>
-      <div class="base"><span>Built by Kartikey Singh</span><span>Current project snapshot · October 2026</span></div>
+      <div class="base"><span>Built by Kartikey Singh</span><span>Current project snapshot · November 2026</span></div>
     </div>
   </footer>
   <script src="/site.js" defer></script>
