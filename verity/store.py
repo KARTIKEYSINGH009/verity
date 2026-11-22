@@ -18,7 +18,7 @@ from pathlib import Path
 from . import config
 
 _COLUMNS = ("ts, model, input_text, output_text, latency_ms, blocked,"
-            " flags_json, faithfulness, client_id")
+            " flags_json, faithfulness, client_id, decision_id")
 
 
 def _use_postgres() -> bool:
@@ -73,7 +73,8 @@ def _sqlite_init_once() -> None:
             blocked INTEGER NOT NULL DEFAULT 0,
             flags_json TEXT NOT NULL DEFAULT '[]',
             faithfulness REAL,
-            client_id TEXT NOT NULL DEFAULT ''
+            client_id TEXT NOT NULL DEFAULT '',
+            decision_id TEXT NOT NULL DEFAULT ''
         )
         """
     )
@@ -82,6 +83,12 @@ def _sqlite_init_once() -> None:
     if "client_id" not in cols:
         conn.execute(
             "ALTER TABLE traces ADD COLUMN client_id TEXT NOT NULL"
+            " DEFAULT ''")
+    # Older databases predate the decision_id column (MCP receipts).
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(traces)")}
+    if "decision_id" not in cols:
+        conn.execute(
+            "ALTER TABLE traces ADD COLUMN decision_id TEXT NOT NULL"
             " DEFAULT ''")
     conn.execute(
         """
@@ -152,14 +159,15 @@ def _sqlite_init_once() -> None:
 
 
 def _sqlite_log(model, input_text, output_text, latency_ms, blocked,
-                flags, faithfulness, client_id) -> int:
+                flags, faithfulness, client_id, decision_id="") -> int:
     _sqlite_init()
     conn = _connect()
     cur = conn.execute(
         f"INSERT INTO traces ({_COLUMNS})"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (time.time(), model, input_text, output_text, latency_ms,
-         int(blocked), json.dumps(list(flags)), faithfulness, client_id),
+         int(blocked), json.dumps(list(flags)), faithfulness, client_id,
+         decision_id),
     )
     conn.commit()
     row_id = cur.lastrowid
@@ -200,7 +208,8 @@ CREATE TABLE IF NOT EXISTS traces (
     blocked INTEGER NOT NULL DEFAULT 0,
     flags_json TEXT NOT NULL DEFAULT '[]',
     faithfulness DOUBLE PRECISION,
-    client_id TEXT NOT NULL DEFAULT ''
+    client_id TEXT NOT NULL DEFAULT '',
+    decision_id TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS pilot_requests (
     id BIGSERIAL PRIMARY KEY,
@@ -329,19 +338,24 @@ def _pg_init() -> None:
         with _pg_connect() as conn:
             conn.execute(_PG_SCHEMA)
             conn.execute(_PG_PORTAL_SCHEMA)
+            # Older databases predate the decision_id column.
+            conn.execute(
+                "ALTER TABLE traces ADD COLUMN IF NOT EXISTS"
+                " decision_id TEXT NOT NULL DEFAULT ''")
         _PG_INIT_URL = url
 
 
 def _pg_log(model, input_text, output_text, latency_ms, blocked,
-            flags, faithfulness, client_id) -> int:
+            flags, faithfulness, client_id, decision_id="") -> int:
     _pg_init()
     with _pg_connect() as conn:
         row = conn.execute(
             f"INSERT INTO traces ({_COLUMNS})"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            " RETURNING id",
             (time.time(), model, input_text, output_text, latency_ms,
              int(blocked), json.dumps(list(flags)), faithfulness,
-             client_id),
+             client_id, decision_id),
         ).fetchone()
         if config.TRACE_RETENTION_DAYS > 0:
             cutoff = time.time() - config.TRACE_RETENTION_DAYS * 86400
@@ -391,15 +405,18 @@ def _db_text(value):
 
 def log_trace(model, input_text, output_text, latency_ms,
               blocked=False, flags=(), faithfulness=None,
-              client_id="") -> int:
-    model, input_text, output_text, client_id = (
+              client_id="", decision_id="") -> int:
+    model, input_text, output_text, client_id, decision_id = (
         _db_text(model) or "", _db_text(input_text) or "",
-        _db_text(output_text) or "", _db_text(client_id) or "")
+        _db_text(output_text) or "", _db_text(client_id) or "",
+        _db_text(decision_id) or "")
     if _use_postgres():
         return _pg_log(model, input_text, output_text, latency_ms,
-                       blocked, flags, faithfulness, client_id)
+                       blocked, flags, faithfulness, client_id,
+                       decision_id)
     return _sqlite_log(model, input_text, output_text, latency_ms,
-                       blocked, flags, faithfulness, client_id)
+                       blocked, flags, faithfulness, client_id,
+                       decision_id)
 
 
 def recent_traces(limit=50, client_id=None):

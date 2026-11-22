@@ -15,6 +15,19 @@ def _int_env(name: str, default: int) -> int:
         return default
 
 
+def _float_env(name: str, default: float) -> float:
+    """Parse a float env var; a malformed value falls back to the
+    default with a warning instead of crashing startup."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        print(f"warning: {name}={raw!r} is not a float; using {default}")
+        return default
+
+
 UPSTREAM_BASE_URL = os.getenv("VERITY_UPSTREAM_BASE_URL", "https://api.openai.com")
 UPSTREAM_API_KEY = os.getenv("VERITY_UPSTREAM_API_KEY", "")
 MOCK_MODE = os.getenv("VERITY_MOCK_MODE", "true").lower() == "true"
@@ -143,3 +156,31 @@ ALLOW_OPEN = os.getenv("VERITY_ALLOW_OPEN", "false").lower() == "true"
 # could smuggle an unbounded payload past the size limit in a context.
 MAX_POLICY_CHARS = _int_env("VERITY_MAX_POLICY_CHARS", 4000)
 MAX_GROUNDING_CHARS = _int_env("VERITY_MAX_GROUNDING_CHARS", 50000)
+
+
+def _list_env(name: str, lower: bool = True) -> tuple[str, ...]:
+    """Comma-separated env var, empty items dropped. Hosts are
+    lower-cased; canaries are not (matching is case-sensitive)."""
+    items = [p.strip() for p in os.getenv(name, "").split(",") if p.strip()]
+    if lower:
+        items = [p.lower() for p in items]
+    return tuple(items)
+
+
+# Egress guard (response side): hosts the model's reply may link to, and
+# canary strings planted in grounding data whose appearance in a reply
+# means a leak. Both empty by default: with no allowlist, ANY URL in a
+# reply blocks, and with no canaries, canary screening is off.
+EGRESS_ALLOWED_URL_HOSTS = _list_env("VERITY_EGRESS_ALLOWED_URL_HOSTS")
+EGRESS_CANARIES = _list_env("VERITY_EGRESS_CANARIES", lower=False)
+
+
+# Three-way verdict thresholds (2026-11-22, piece 2): block / gray / allow.
+# Env overrides use the VERITY_VERDICT_* names; the VERDICT_* attributes
+# are what verdict.py reads (and what tests monkeypatch).
+VERDICT_BLOCK_SCORE = _float_env("VERITY_VERDICT_BLOCK_SCORE", 0.85)
+VERDICT_SESSION_BLOCK = _float_env("VERITY_VERDICT_SESSION_BLOCK", 0.75)
+VERDICT_GRAY_SCORE_MIN = _float_env("VERITY_VERDICT_GRAY_SCORE_MIN", 0.50)
+VERDICT_GRAY_SCORE_MAX = _float_env("VERITY_VERDICT_GRAY_SCORE_MAX", 0.85)
+VERDICT_OBFUSCATION_DELTA = _float_env("VERITY_VERDICT_OBFUSCATION_DELTA", 0.25)
+VERDICT_EMA_GRAY = _float_env("VERITY_VERDICT_EMA_GRAY", 0.40)

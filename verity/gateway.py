@@ -8,31 +8,37 @@ import asyncio
 import hashlib
 import hmac
 import json
+import logging
 import re
 import time
 import uuid
 from datetime import datetime, timezone
+from typing import Any
 from urllib.parse import urlencode
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from . import config, mailer
 from .action_check import check_actions, unknown_language_risky
 from .cleaner import sanitize
+from .egress import scan_output
 from .guard import screen
 from .judge import judge_faithfulness
 from .judge_authority import decision_from_flags
 from .language import detect_language
+from .normalize import harden_normalize, scan_windows
 from .policy import check_baseline_response as baseline_check_response
 from .policy import check_request as policy_check_request
 from .policy import check_response as policy_check_response
 from .policy import inspect_mcp_tool_arguments
 from .scoring import faithfulness_score
+from .session_risk import SessionRisk
+from .verdict import compute_verdict
 from .store import (DuplicateEmail, _db_text, active_api_key, claim_auth_token,
                     create_session, create_user, delete_session,
                     delete_user_sessions, find_api_key, get_auth_token,
@@ -44,6 +50,8 @@ from .store import (DuplicateEmail, _db_text, active_api_key, claim_auth_token,
                     recent_traces, revoke_api_keys, set_email_verified,
                     set_marketing_opt_in, update_user_password,
                     usage_for_client, usage_series)
+
+logger = logging.getLogger("verity.gateway")
 
 
 @asynccontextmanager
@@ -58,6 +66,45 @@ app = FastAPI(
     redoc_url="/redoc" if config.ENABLE_DOCS else None,
     openapi_url="/openapi.json" if config.ENABLE_DOCS else None,
 )
+
+
+_NOT_FOUND_PAGE = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Page not found — Verity</title>
+<style>
+body{margin:0;background:#0a0d0b;color:#d7e0d8;
+font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+display:grid;place-items:center;min-height:100vh}
+main{text-align:center;padding:32px}
+h1{font-size:2rem;margin:0 0 8px;color:#e8f0e9}
+p{color:#93a89b;margin:0 0 24px}
+a{color:#4fbf8a;text-decoration:none;margin:0 10px}
+a:hover{text-decoration:underline}
+.brand{font-weight:700;letter-spacing:.06em;color:#4fbf8a}
+</style></head><body><main>
+<div class="brand">VERITY.</div>
+<h1>Page not found</h1>
+<p>This page doesn't exist, or it moved.</p>
+<p><a href="/">Home</a><a href="/dashboard">Dashboard</a>
+<a href="/documentation">Documentation</a></p>
+</main></body></html>"""
+
+
+@app.exception_handler(404)
+async def branded_not_found(request: Request, exc: HTTPException):
+    # Only brand the framework's own "route doesn't exist" 404 (detail
+    # "Not Found"). Handlers that raise a specific 404 with a structured
+    # detail (e.g. account_not_found) keep their response untouched.
+    if exc.detail != "Not Found":
+        return JSONResponse({"detail": exc.detail}, status_code=404)
+    # API clients get JSON, as before; browsers get a branded page
+    # instead of FastAPI's raw {"detail": "Not Found"}. /docs stays
+    # 404 on purpose (Swagger is disabled there) — it just looks
+    # like Verity now instead of leaking the framework.
+    if request.url.path.startswith("/v1/"):
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
+    return HTMLResponse(_NOT_FOUND_PAGE, status_code=404)
 
 
 # --- Client authentication (audit F2) ---------------------------------------
@@ -174,10 +221,18 @@ class ChatRequest(BaseModel):
     model: str = "gpt-4o-mini"
     messages: list[Message] = Field(min_length=1,
                                     max_length=config.MAX_MESSAGES)
+    # Optional: caller-supplied session id for multi-turn risk tracking.
+    # When absent, session risk is keyed per client ("default").
+    session_id: str | None = None
     # Optional: reference text the answer must stay grounded in.
     grounding_context: str = ""
     # Optional: business policy the interaction must obey (milestone 4).
     policy_context: str = ""
+    # Optional: OpenAI-style tool definitions for this turn. Tools are
+    # forwarded upstream only on allow turns; gray turns refuse them
+    # (see chat_completions) rather than silently stripping them.
+    tools: list[dict] | None = None
+    tool_choice: str | None = None
 
 
 def _mock_completion(model: str, messages: list[Message]) -> dict:
@@ -253,6 +308,30 @@ def traces(limit: int = 50, client_id: str | None = None,
 
 # Best-effort per-client rate limit (in-memory; per instance on serverless).
 _hits: dict[str, deque] = defaultdict(deque)
+
+
+# Multi-turn session risk (2026-11-22 wedge, in-memory; per instance on
+# serverless). A Redis-backed store can replace it later via
+# SessionRisk(store=...); see verity/session_risk.py.
+SESSION_RISK = SessionRisk()
+
+
+def _session_blocked(client_id: str, session_id: str | None, score: float,
+                     text: str) -> bool:
+    """Record a message score and say whether the session rule blocks it.
+
+    Scores are recorded for EVERY screened message, including ones the
+    guard already blocks, so repeated probing lifts the session EMA and a
+    later borderline message trips the combined rule. Without that, the
+    combined bar (0.6 * current + 0.4 * ema >= 0.75) could never fire:
+    every score feeding the EMA would be < 0.75 (the classifier
+    threshold), so the weighted sum could never reach 0.75 either.
+    """
+    key = session_id or "default"
+    ema = SESSION_RISK.add(client_id, key, score, text)
+    if score >= 0.85:
+        return True
+    return 0.6 * score + 0.4 * ema >= 0.75
 
 
 def _client_key(request: Request) -> str:
@@ -672,6 +751,7 @@ def me(request: Request):
                "quota": ({"limit_per_month": config.FREE_MONTHLY_QUOTA}
                          if user["plan"] == "free" else None),
                "email_verified": get_email_verified(user["id"]),
+               "email_verification_on": mailer.verification_required(),
                "marketing_opt_in": get_marketing_state(
                    user["id"])["opt_in"],
                "traces": []}
@@ -686,7 +766,8 @@ def me(request: Request):
              "blocked": t["blocked"],
              "latency_ms": t["latency_ms"],
              "flags": _parse_flags(t.get("flags_json")),
-             "faithfulness": t["faithfulness"]}
+             "faithfulness": t["faithfulness"],
+             "decision_id": t.get("decision_id", "")}
             for t in recent_traces(limit=10, client_id=client_id)]
     return payload
 
@@ -1014,8 +1095,46 @@ async def google_callback(request: Request, code: str | None = None,
     return resp
 
 
+def _screen_all_windows(text: str) -> dict:
+    """Screen text window by window; merge signals, max classifier score.
+
+    Mirrors the old per-message merge: the first window seeds the verdict,
+    later windows union their signals and heuristic hits and raise the
+    classifier score to the max. Returns a screen()-shaped dict.
+    """
+    merged: dict | None = None
+    for window in scan_windows(text):
+        wv = screen(window)
+        if merged is None:
+            merged = {
+                "blocked": bool(wv.get("blocked", False)),
+                "signals": list(wv.get("signals", [])),
+                "heuristic_hits": list(wv.get("heuristic_hits", [])),
+                "classifier_score": wv.get("classifier_score"),
+            }
+        else:
+            for s in wv.get("signals", []):
+                if s not in merged["signals"]:
+                    merged["signals"].append(s)
+            for h in wv.get("heuristic_hits", []):
+                if h not in merged["heuristic_hits"]:
+                    merged["heuristic_hits"].append(h)
+            if wv.get("blocked"):
+                merged["blocked"] = True
+            if (wv.get("classifier_score") is not None
+                    and (merged["classifier_score"] is None
+                         or wv["classifier_score"]
+                         > merged["classifier_score"])):
+                merged["classifier_score"] = wv["classifier_score"]
+    if merged is None:
+        return {"blocked": False, "signals": [], "heuristic_hits": [],
+                "classifier_score": 0.0}
+    return merged
+
+
 @app.post("/v1/chat/completions")
 async def chat_completions(req: ChatRequest, request: Request,
+                           response: Response,
                            authorization: str | None = Header(default=None)):
     started = time.perf_counter()
     if not _client_authorized(authorization):
@@ -1068,6 +1187,8 @@ async def chat_completions(req: ChatRequest, request: Request,
     # trace shows where the attack rode in.
     flags: list[str] = []
     blocked_role: str | None = None
+    overall_verdict = "allow"
+    gray_reasons: list[str] = []
     # AEGIS restructure (2026-10-27, local): cleaner -> language -> guard
     # -> action check -> context release -> policy (baseline + client) ->
     # judge authority (staged) -> model -> response policy. The cleaner
@@ -1075,13 +1196,49 @@ async def chat_completions(req: ChatRequest, request: Request,
     cleaned = sanitize(combined)
     lang = detect_language(cleaned)
     flags.append(f"lang:{lang}")
+    cid = _client_id(authorization)
     for m in req.messages:
-        v = screen(m.content)
+        # Hardened normalizer (2026-11-22 wedge): NFKC, zero-width/bidi
+        # strip, URL/hex decode — applied before the rules + classifier,
+        # so an obfuscated injection is judged by its real content.
+        # Long inputs are screened window by window (head, tail, strided
+        # middles); signals merge and the classifier score is the max
+        # across windows, so a payload buried in a long benign tail
+        # cannot dilute the score. Model input and traces keep the
+        # original text.
+        normalized = harden_normalize(m.content)
+        v = _screen_all_windows(normalized)
         eff = v
+        current = v["classifier_score"]
+
+        # Obfuscation delta: only re-screen raw input when normalization
+        # actually changed the message text.
+        if normalized != m.content:
+            raw_v = _screen_all_windows(m.content)
+            raw_score = raw_v["classifier_score"] or 0.0
+            obfuscation_delta = max(0.0, (current or 0.0) - raw_score)
+        else:
+            obfuscation_delta = 0.0
+
+        # Session risk (2026-11-22 wedge): the message score is recorded
+        # even when the guard blocks it, so repeated probing lifts the
+        # session EMA; a later borderline message then trips the combined
+        # rule. Flagged as session_risk, never silent. The context-release
+        # layer below applies to guard blocks only — it never releases a
+        # session-risk block.
+        session_blocked = False
+        if current is not None:
+            session_blocked = _session_blocked(
+                cid, req.session_id, current, normalized)
+            if session_blocked and "session_risk" not in flags:
+                flags.append("session_risk")
+        ema = SESSION_RISK.get_risk(cid, req.session_id or "default")
+
         # Contextual release layer (2026-10-23): under its strict
         # conditions it may release a discussion/transformation block.
         # Releases are always trace-flagged; "shadow" records without
         # applying, "on" applies, "off" skips entirely.
+        released_by_context = False
         if config.CONTEXT_RELEASE_MODE != "off":
             from .contextual import context_screen
             cv = context_screen(m.content, base=v)
@@ -1091,13 +1248,42 @@ async def chat_completions(req: ChatRequest, request: Request,
                         flags.append(f)
                 if config.CONTEXT_RELEASE_MODE == "on":
                     eff = cv
+                    released_by_context = True
             if cv.get("escalate") and "ctx:AMBIGUOUS" not in flags:
                 flags.append("ctx:AMBIGUOUS")
+
         for s in v["signals"]:
             if s not in flags:
                 flags.append(s)
-        if eff["blocked"] and blocked_role is None:
-            blocked_role = m.role
+
+        if session_blocked:
+            msg_verdict = {
+                "verdict": "block",
+                "reason": "session_combined",
+                "reasons": ["session_combined"],
+            }
+        elif released_by_context:
+            # Preserve contextual-release semantics: a released block stays
+            # released as today (never re-blocked or downgraded to gray).
+            msg_verdict = {
+                "verdict": "allow",
+                "reason": "context_released",
+                "reasons": [],
+            }
+        else:
+            msg_verdict = compute_verdict(eff, current, ema, obfuscation_delta)
+
+        if msg_verdict["verdict"] == "block":
+            overall_verdict = "block"
+            if blocked_role is None:
+                blocked_role = m.role
+        elif msg_verdict["verdict"] == "gray":
+            if overall_verdict != "block":
+                overall_verdict = "gray"
+            for r in msg_verdict["reasons"]:
+                if r not in gray_reasons:
+                    gray_reasons.append(r)
+
         # Injection-judge escalation, SHADOW mode only (2026-10-23):
         # verdicts are recorded on the trace (case, verdict, confidence,
         # latency, errors, disagreements) and never change the outcome.
@@ -1114,13 +1300,51 @@ async def chat_completions(req: ChatRequest, request: Request,
                     flags.append(f)
     if blocked_role is not None:
         flags.append(f"role:{blocked_role}")
-    cid = _client_id(authorization)
     if blocked_role is not None and config.BLOCK_ON_INJECTION:
         log_trace(req.model, combined, "", 0.0, blocked=True, flags=flags,
                   client_id=cid)
         raise HTTPException(status_code=400, detail={
             "error": "blocked_by_verity_guard", "matched_rules": flags})
 
+
+    if overall_verdict == "gray":
+        if "verdict:gray" not in flags:
+            flags.append("verdict:gray")
+        for r in gray_reasons:
+            gf = f"gray:{r}"
+            if gf not in flags:
+                flags.append(gf)
+        logger.info(
+            "verity_gray_zone client_id=%s model=%s reasons=%s "
+            "has_tools=%s flags=%s",
+            cid, req.model, gray_reasons, bool(req.tools), flags,
+        )
+        # Capability throttling on gray-zone turns:
+        # ChatRequest accepts OpenAI-style `tools` / `tool_choice` and
+        # normally forwards them only on allow turns. When a turn lands in
+        # the gray zone and carries active tools (`req.tools` with
+        # `tool_choice != "none"`), we refuse with 400 rather than silently
+        # stripping tools the caller may require for a money-moving or
+        # state-changing action. Text-only gray turns (or tool_choice="none")
+        # proceed to the model without tool definitions.
+        if req.tools and req.tool_choice != "none":
+            flags.append("gray_tools_refused")
+            latency_ms = (time.perf_counter() - started) * 1000
+            log_trace(req.model, combined, "", latency_ms, blocked=True,
+                      flags=flags, client_id=cid)
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "gray_zone_tools_refused",
+                    "verdict": "gray",
+                    "reasons": gray_reasons,
+                    "reason": "Tool use is refused for gray-zone requests.",
+                },
+                headers={
+                    "X-Verity-Verdict": "gray",
+                    "X-Verity-Verdict-Reason": ",".join(gray_reasons),
+                },
+            )
     # 1a. Baseline policy (AEGIS restructure): the action check runs on
     # every request, no client policy needed. The context-release layer
     # above applies to guard blocks only — it never releases a baseline
@@ -1171,13 +1395,37 @@ async def chat_completions(req: ChatRequest, request: Request,
     if config.MOCK_MODE:
         result = _mock_completion(req.model, req.messages)
     else:
-        result = await _upstream_completion(
-            {"model": req.model,
-             "messages": [m.model_dump() for m in req.messages]})
+        upstream_payload: dict[str, Any] = {
+            "model": req.model,
+            "messages": [m.model_dump() for m in req.messages],
+        }
+        if overall_verdict == "allow" and req.tools:
+            upstream_payload["tools"] = req.tools
+            if req.tool_choice is not None:
+                upstream_payload["tool_choice"] = req.tool_choice
+        result = await _upstream_completion(upstream_payload)
 
     # Tool-call completions carry content=None per the OpenAI spec
     # (audit #20) — coerce defensively instead of 500ing downstream.
     _msg = (result.get("choices") or [{}])[0].get("message") or {}
+    if overall_verdict == "gray" and _msg.get("tool_calls"):
+        gflags = list(flags) + ["gray_tools_refused"]
+        latency_ms = (time.perf_counter() - started) * 1000
+        log_trace(req.model, combined, "", latency_ms, blocked=True,
+                  flags=gflags, client_id=cid)
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "gray_zone_tools_refused",
+                "verdict": "gray",
+                "reasons": gray_reasons,
+                "reason": "Tool calls are refused for gray-zone responses.",
+            },
+            headers={
+                "X-Verity-Verdict": "gray",
+                "X-Verity-Verdict-Reason": ",".join(gray_reasons),
+            },
+        )
     # Pentest F-01: an upstream answer could also carry a lone surrogate,
     # so sanitize the answer before it is returned to the caller.
     answer = _db_text(_msg.get("content") or "")
@@ -1212,6 +1460,29 @@ async def chat_completions(req: ChatRequest, request: Request,
                 "action": policy_result.get("action"),
                 "reason": policy_result.get("reason", "")})
 
+    # 2c. Egress guard (response side): scan the model's reply for a
+    # leaked canary, a link to a host that is not allowlisted, or PII
+    # before it reaches the user. Block beats redact; a blocked reply
+    # never leaves Verity. A redacted reply goes out with the sensitive
+    # bits replaced and an egress_redacted flag on the trace.
+    egress_result = scan_output(
+        answer,
+        canaries=config.EGRESS_CANARIES,
+        allowed_url_hosts=config.EGRESS_ALLOWED_URL_HOSTS,
+    )
+    if egress_result["action"] == "block":
+        eflags = list(flags) + ["egress_blocked"]
+        latency_ms = (time.perf_counter() - started) * 1000
+        log_trace(req.model, combined, answer, latency_ms, blocked=True,
+                  flags=eflags, client_id=cid)
+        raise HTTPException(status_code=400, detail={
+            "error": "blocked_by_verity_egress",
+            "findings": egress_result["findings"]})
+    if egress_result["action"] == "redact":
+        answer = str(egress_result["text"])
+        _msg["content"] = answer
+        flags = list(flags) + ["egress_redacted"]
+
     # 3. Score faithfulness when grounding context was supplied.
     # Milestone 2: LLM-as-judge is primary, heuristic kept as fallback/detail.
     score = None
@@ -1225,13 +1496,24 @@ async def chat_completions(req: ChatRequest, request: Request,
         flags = list(flags) + ["hallucination_risk"]
 
     latency_ms = (time.perf_counter() - started) * 1000
-    log_trace(req.model, combined, answer, latency_ms,
+    log_trace(req.model, combined, answer, latency_ms, blocked=False,
               flags=flags,
               faithfulness=score["score"] if score else None,
               client_id=cid)
 
-    result.setdefault("verity", {}).update(
-        {"guard_flags": flags, "faithfulness": score})
+    verity_meta: dict[str, Any] = {
+        "guard_flags": flags,
+        "faithfulness": score,
+    }
+    if overall_verdict == "gray":
+        response.headers["X-Verity-Verdict"] = "gray"
+        response.headers["X-Verity-Verdict-Reason"] = ",".join(gray_reasons)
+        verity_meta.update({
+            "verdict": "gray",
+            "verdict_reasons": gray_reasons,
+            "throttled": True,
+        })
+    result.setdefault("verity", {}).update(verity_meta)
     if policy_result is not None:
         result["verity"]["policy"] = {"checked": True, "result": "pass",
                                       "method": policy_result["method"]}
@@ -1249,9 +1531,11 @@ async def chat_completions(req: ChatRequest, request: Request,
 #
 # Auth is exactly like /v1/chat/completions: _client_authorized, 401
 # invalid_api_key BEFORE any screening, then the same IP + per-key rate
-# limits. (The zip's endpoints had no auth at all; that flaw was not
-# ported.) No upstream budget is spent here, so the free-plan quota and
-# the email-verification gate — both completions concerns — do not apply.
+# limits, then the same free-plan quota (_enforce_free_quota, 429
+# quota_exceeded at 1,000/month for portal keys — MCP calls are logged
+# to traces under the caller's client id, so they count toward the same
+# monthly total chat checks). The email-verification gate is a
+# completions concern and does NOT apply here (separate founder pick).
 #
 # Deliberately NOT in this piece: state_context / HMAC enforcement
 # (piece 4), DLP in arguments or results (piece 3), RAG screening of
@@ -1275,9 +1559,10 @@ class MCPGuardRequest(BaseModel):
 
 
 def _mcp_receipt(*, allowed: bool, deciding_layer: str, signal: str,
-                 tool_verdict: str, latency_ms: float) -> dict:
+                 tool_verdict: str, latency_ms: float,
+                 decision_id: str | None = None) -> dict:
     return {
-        "decision_id": f"vrt_{uuid.uuid4().hex[:16]}",
+        "decision_id": decision_id or f"vrt_{uuid.uuid4().hex[:16]}",
         "allowed": allowed,
         "deciding_layer": deciding_layer,
         "signal": signal,
@@ -1320,7 +1605,12 @@ async def mcp_tool_guard(req: MCPGuardRequest, request: Request,
                 "key:" + hashlib.sha256(_tok.encode()).hexdigest()[:16]):
             raise HTTPException(status_code=429,
                                 detail={"error": "rate_limited"})
+    _enforce_free_quota(authorization)
     cid = _client_id(authorization)
+    # One decision id for the receipt AND the trace row, so the dashboard
+    # can find a receipt by its id (the trace table used to store only a
+    # numeric id, which no receipt ever matched).
+    decision_id = f"vrt_{uuid.uuid4().hex[:16]}"
     post_tool = req.tool_result is not None
     phase = "post" if post_tool else "pre"
     layer = f"mcp_{phase}_tool_arguments"
@@ -1333,11 +1623,12 @@ async def mcp_tool_guard(req: MCPGuardRequest, request: Request,
             latency_ms = (time.perf_counter() - started) * 1000
             flags = [f"mcp:{res['reason']}", f"mcp:{phase}"]
             log_trace("mcp-guard", trace_input, "", latency_ms,
-                      blocked=True, flags=flags, client_id=cid)
+                      blocked=True, flags=flags, client_id=cid,
+                      decision_id=decision_id)
             receipt = _mcp_receipt(
                 allowed=False, deciding_layer=layer,
                 signal=res["reason"], tool_verdict="blocked",
-                latency_ms=latency_ms)
+                latency_ms=latency_ms, decision_id=decision_id)
             raise HTTPException(status_code=403, detail={
                 "error": "blocked_by_verity_mcp_guard",
                 "signal": res["reason"],
@@ -1348,11 +1639,11 @@ async def mcp_tool_guard(req: MCPGuardRequest, request: Request,
     latency_ms = (time.perf_counter() - started) * 1000
     log_trace("mcp-guard", trace_input, "", latency_ms,
               blocked=False, flags=["mcp:verified_safe", f"mcp:{phase}"],
-              client_id=cid)
+              client_id=cid, decision_id=decision_id)
     receipt = _mcp_receipt(
         allowed=True, deciding_layer="mcp_guard",
         signal="verified_safe", tool_verdict="verified_safe",
-        latency_ms=latency_ms)
+        latency_ms=latency_ms, decision_id=decision_id)
     return {"allowed": True, "tool_verdict": "verified_safe",
             "verity_receipt": receipt}
 
@@ -1401,12 +1692,18 @@ def pricing_page():
 
 
 @app.get("/signup", include_in_schema=False)
-def signup_page():
+def signup_page(request: Request):
+    # Signed-in visitors already have an account; send them to the
+    # dashboard instead of showing them a signup form.
+    if _session_user(request) is not None:
+        return RedirectResponse("/dashboard", status_code=303)
     return FileResponse(_site_dir / "signup.html")
 
 
 @app.get("/login", include_in_schema=False)
-def login_page():
+def login_page(request: Request):
+    if _session_user(request) is not None:
+        return RedirectResponse("/dashboard", status_code=303)
     return FileResponse(_site_dir / "login.html")
 
 

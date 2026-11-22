@@ -108,7 +108,8 @@ def test_postgres_log_and_recent(monkeypatch):
     assert any("CREATE TABLE IF NOT EXISTS traces" in s for s in sqls)
     insert = next(p for s, p in conn.statements
                   if s.strip().startswith("INSERT"))
-    assert insert[-1] == "clientAAA"
+    assert insert[-2] == "clientAAA"  # client_id
+    assert insert[-1] == ""  # decision_id defaults to empty
     assert any(s.strip().startswith("DELETE FROM traces")
                for s in sqls)  # retention pruning ported
     got = store.recent_traces(5, client_id="clientAAA")
